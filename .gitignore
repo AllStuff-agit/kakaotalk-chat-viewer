@@ -20,5 +20,3 @@ yarn-error.log*
 .mcp.json
 .claude/
 CLAUDE.md
-
-index.html.backup

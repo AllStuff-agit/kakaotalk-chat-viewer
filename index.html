@@ -97,30 +97,58 @@
         .font-size-22 { font-size: 22px !important; line-height: 1.5 !important; }
         .font-size-24 { font-size: 24px !important; line-height: 1.6 !important; }
 
+        /* 반응형 말풍선 및 여백 조정 */
+        @media (max-width: 1024px) {
+            /* 태블릿에서 말풍선 최대 너비 증가 */
+            .chat-message-container {
+                max-width: 85% !important;
+            }
+
+            /* 태블릿에서 채팅 영역 여백 조정 */
+            #chat-messages {
+                padding: 1rem 0.75rem !important;
+            }
+
+            /* 태블릿에서 전체 레이아웃 조정 */
+            body {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+        }
+
+        @media (max-width: 640px) {
+            /* 모바일에서 말풍선 최대 너비 더 증가 */
+            .chat-message-container {
+                max-width: 90% !important;
+            }
+
+            /* 모바일에서 채팅 영역 여백 최소화 */
+            #chat-messages {
+                padding: 0.75rem 0.5rem !important;
+            }
+
+            /* 모바일에서 채팅방 헤더 여백 조정 */
+            .bg-white.border-b.border-gray-200.px-4.py-3.flex-shrink-0 {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+            }
+
+            /* 모바일에서 전체 바디 여백 제거 */
+            body, html {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                overflow-x: hidden !important;
+            }
+        }
         
     </style>
 </head>
 <body class="bg-gray-100 font-kakao">
-    <!-- 모바일/태블릿 안내 화면 (데스크톱에서는 숨김) -->
-    <div class="lg:hidden flex items-center justify-center min-h-screen bg-white px-6">
-        <div class="text-center max-w-md">
-            <div class="text-6xl mb-6">🖥️</div>
-            <h1 class="text-2xl font-bold text-gray-800 mb-4">데스크톱 전용 서비스</h1>
-            <p class="text-gray-600 mb-6 leading-relaxed">
-                KakaoTalk Chat Viewer는 데스크톱 환경에서만 이용하실 수 있습니다.
-            </p>
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p class="text-sm text-yellow-800">
-                    💡 PC나 노트북에서 다시 접속해주세요!
-                </p>
-            </div>
-        </div>
-    </div>
-    <!-- 메인 콘텐츠 (데스크톱에서만 표시) -->
-    <div class="hidden lg:flex justify-center bg-gray-100 min-h-screen w-full px-0">
+    <div class="flex justify-center bg-gray-100 min-h-screen w-full lg:px-0 px-0">
         
-        <!-- 왼쪽 사이드바 -->
-        <div class="w-80 min-w-80 max-w-80 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 h-screen">
+        <!-- 왼쪽 사이드바 (PC에서만 표시) -->
+        <div class="hidden lg:flex w-80 min-w-80 max-w-80 bg-white border-r border-gray-200 flex-col flex-shrink-0 h-screen">
                 <!-- 헤더 -->
                 <header class="p-6 border-b border-gray-200">
                     <h1 class="text-xl font-bold text-kakao-brown mb-2">✨​ KakaoTalk Chat Viewer</h1>
@@ -189,8 +217,8 @@
             <div id="error-message" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded m-6 text-sm"></div>
         </div>
 
-        <!-- 메인 채팅 영역 -->
-        <div class="flex w-[600px] flex-shrink-0 flex-col h-screen bg-gray-50">
+        <!-- 메인 채팅 영역 (모바일: 전체, 태블릿 이상: 중앙) -->
+        <div class="flex w-full lg:w-[600px] flex-shrink-0 flex-col h-screen lg:mx-0 mx-0 lg:bg-gray-50">
             <!-- 채팅방 컨테이너 -->
             <div id="chat-container" class="hidden flex flex-col h-full bg-white relative">
                 <!-- 채팅방 헤더 -->
@@ -233,6 +261,33 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                     </svg>
                                 </button>
+                            </div>
+                            
+                            <!-- 모바일 메뉴 아이콘 -->
+                            <div class="lg:hidden relative">
+                                <button id="mobile-menu-btn" class="w-8 h-8 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors flex items-center justify-center">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                                    </svg>
+                                </button>
+
+                                <!-- 모바일 메뉴 드롭다운 -->
+                                <div id="mobile-menu-dropdown" class="hidden absolute top-10 right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                                    <div class="py-1">
+                                        <button id="mobile-info-menu" class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center">
+                                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            채팅방 정보
+                                        </button>
+                                        <button id="mobile-search-menu" class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center">
+                                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+                                            대화내용 검색
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -312,29 +367,57 @@
                         <div class="text-6xl mb-4">💞</div>
                         <h2 class="text-2xl font-semibold mb-2 text-gray-700">카카오톡 채팅방 뷰어</h2>
                         <p class="text-gray-500 mb-6">
-                            왼쪽 사이드바에서 채팅 파일을 업로드해주세요
+                            <span class="hidden lg:inline">왼쪽 사이드바에서 채팅 파일을 업로드해주세요</span>
+                            <span class="lg:hidden">채팅 파일을 업로드해주세요</span>
                         </p>
                     </div>
 
+                    <!-- 모바일/태블릿용 파일 업로드 영역 -->
+                    <div class="lg:hidden">
+                        <div id="mobile-upload-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-all duration-200">
+                            <div class="mb-4">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
+                            <p class="text-lg mb-2 font-medium text-gray-700">파일을 드래그하거나 클릭</p>
+                            <p class="text-sm text-gray-500 mb-4">.txt 파일만 업로드 가능</p>
+                            <input type="file" id="mobile-file-input" accept=".txt" class="hidden">
+                            <button id="mobile-upload-btn" class="bg-kakao-yellow text-kakao-brown px-6 py-3 rounded-lg text-base font-semibold hover:bg-yellow-400 transition-colors">파일 선택</button>
+                        </div>
+
+                        <!-- 모바일용 에러 메시지 -->
+                        <div id="mobile-error-message" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mt-4 text-sm"></div>
+
+                        <!-- 모바일용 로딩 상태 -->
+                        <div id="mobile-loading" class="hidden text-center mt-6">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-kakao-yellow"></div>
+                            <p class="mt-3 text-sm text-gray-600">분석 중...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-        <!-- 오른쪽 검색 사이드바 -->
-        <div id="search-sidebar" class="flex w-80 min-w-80 max-w-80 bg-white border-l border-gray-200 flex-col h-screen">
-            <!-- 검색 패널 -->
-            <div class="flex flex-col h-full">
-                <!-- 검색 헤더 -->
+            
+            <!-- 모바일 검색 패널 (모바일에서만 표시) -->
+            <div id="mobile-search-panel" class="hidden lg:hidden fixed inset-0 bg-white z-50 flex flex-col">
+                <!-- 모바일 검색 헤더 -->
+                <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800">대화내용 검색</h2>
+                    <button id="mobile-search-close" class="w-8 h-8 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors flex items-center justify-center">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- 모바일 검색 입력 -->
                 <div class="p-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">대화내용 검색</h3>
-
-                    <!-- 검색 입력창과 달력 아이콘 -->
-                    <div class="flex items-center space-x-3">
-                        <!-- 검색 입력창 -->
+                    <div class="flex space-x-2">
                         <div class="flex-1 relative">
-                            <input
-                                type="text"
-                                id="search-input"
-                                placeholder="대화 내용을 검색하세요..."
+                            <input 
+                                type="text" 
+                                id="mobile-search-input" 
+                                placeholder="대화 내용을 검색하세요..." 
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-kakao-yellow focus:border-transparent"
                             >
                             <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -343,57 +426,242 @@
                                 </svg>
                             </div>
                         </div>
-
-                        <!-- 날짜 필터 버튼 -->
-                        <button id="date-filter-btn" class="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300">
+                        <button id="mobile-date-filter-btn" class="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300">
                             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                             </svg>
                         </button>
                     </div>
-
-                    <!-- 검색 버튼 -->
-                    <button id="integrated-search" class="mt-3 w-full bg-kakao-yellow text-kakao-brown py-3 px-4 rounded-lg hover:bg-yellow-400 transition-colors text-sm font-medium">
+                    
+                    <!-- 모바일 검색 버튼 -->
+                    <button id="mobile-integrated-search" class="mt-3 w-full bg-kakao-yellow text-kakao-brown py-3 px-4 rounded-lg hover:bg-yellow-400 transition-colors text-sm font-medium">
                         검색
                     </button>
                 </div>
-
-                <!-- 달력 팝업 -->
-                <div id="calendar-popup" class="hidden p-4 border-b border-gray-200 bg-gray-50">
-                    <div class="mb-3">
-                        <div class="flex items-center justify-between mb-3">
-                            <button id="prev-month" class="p-1 hover:bg-gray-200 rounded transition-colors">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                                </svg>
-                            </button>
-                            <h4 id="calendar-month-year" class="text-lg font-semibold text-gray-800"></h4>
-                            <button id="next-month" class="p-1 hover:bg-gray-200 rounded transition-colors">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                                </svg>
-                            </button>
+                
+                <!-- 모바일 검색 결과 -->
+                <div class="flex-1 overflow-y-auto">
+                    <!-- 로딩 -->
+                    <div id="mobile-search-loading" class="hidden p-4 text-center">
+                        <div class="flex justify-center">
+                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-kakao-yellow"></div>
                         </div>
-                        <div class="grid grid-cols-7 gap-1 mb-2">
-                            <div class="text-center py-1 text-xs font-semibold text-gray-600">일</div>
-                            <div class="text-center py-1 text-xs font-semibold text-gray-600">월</div>
-                            <div class="text-center py-1 text-xs font-semibold text-gray-600">화</div>
-                            <div class="text-center py-1 text-xs font-semibold text-gray-600">수</div>
-                            <div class="text-center py-1 text-xs font-semibold text-gray-600">목</div>
-                            <div class="text-center py-1 text-xs font-semibold text-gray-600">금</div>
-                            <div class="text-center py-1 text-xs font-semibold text-gray-600">토</div>
-                        </div>
-                        <div id="calendar-grid" class="grid grid-cols-7 gap-1">
-                            <!-- 날짜들이 동적으로 추가됩니다 -->
+                        <span class="text-gray-600 text-sm">검색 중...</span>
+                    </div>
+                    
+                    <!-- 검색 결과 -->
+                    <div id="mobile-search-results" class="p-4">
+                        <div class="text-center text-gray-500 text-sm py-8">
+                            검색어를 입력해주세요
                         </div>
                     </div>
-                    <button id="close-calendar" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-lg text-sm transition-colors">
-                        닫기
-                    </button>
+                    
+                    <!-- 달력 팝업 -->
+                    <div id="mobile-calendar-popup" class="hidden p-4 border-b border-gray-200">
+                        <div class="bg-white border border-gray-200 rounded-lg shadow-lg p-4 relative">
+                            <!-- 닫기 버튼 -->
+                            <button id="mobile-close-calendar" class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 transition-colors" title="달력 닫기">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+
+                            <div class="flex items-center justify-between mb-4 mt-6">
+                                <button id="mobile-prev-month" class="p-1 text-gray-500 hover:text-gray-700">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                    </svg>
+                                </button>
+                                <h3 id="mobile-calendar-month-year" class="text-lg font-semibold text-gray-800"></h3>
+                                <button id="mobile-next-month" class="p-1 text-gray-500 hover:text-gray-700">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- 요일 헤더 -->
+                            <div class="grid grid-cols-7 gap-1 mb-2">
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">일</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">월</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">화</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">수</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">목</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">금</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">토</div>
+                            </div>
+
+                            <!-- 날짜 그리드 -->
+                            <div id="mobile-calendar-days" class="grid grid-cols-7 gap-1">
+                                <!-- 날짜들이 동적으로 추가됩니다 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 모바일 채팅방 정보 패널 (모바일에서만 표시) -->
+        <div id="mobile-info-panel" class="hidden lg:hidden fixed inset-0 bg-white z-50 flex flex-col">
+            <!-- 모바일 정보 패널 헤더 -->
+            <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-800">채팅방 정보</h2>
+                <button id="mobile-info-close" class="w-8 h-8 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors flex items-center justify-center">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 모바일 정보 패널 내용 -->
+            <div class="flex-1 overflow-y-auto">
+                <!-- 채팅방 정보 -->
+                <div id="mobile-chat-info" class="hidden p-4 border-b border-gray-200">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3">채팅방 정보</h3>
+                    <div class="text-sm text-gray-600 space-y-3">
+                        <div>
+                            <span class="text-gray-500">채팅방:</span>
+                            <div id="mobile-chat-title" class="font-medium text-gray-800 break-words mt-1"></div>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">저장일:</span>
+                            <div id="mobile-save-date" class="font-medium text-gray-800 mt-1"></div>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">메시지 수:</span>
+                            <span id="mobile-message-count" class="font-medium text-gray-800"></span>개
+                        </div>
+                    </div>
+
+                    <!-- 대화 좌우 변경 -->
+                    <div class="mt-6 pt-4 border-t border-gray-200">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">내 메시지 사용자 선택</h4>
+                        <div class="text-xs text-gray-500 mb-3">클릭하여 해당 사용자를 "나"로 설정:</div>
+
+                        <!-- 사용자 변경 로딩 -->
+                        <div id="mobile-user-switching-loading" class="hidden mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                                <span class="text-sm text-blue-700">대화 위치 변경 중...</span>
+                            </div>
+                        </div>
+
+                        <div id="mobile-user-buttons" class="space-y-2">
+                            <!-- 사용자 버튼들이 동적으로 추가됩니다 -->
+                        </div>
+                    </div>
                 </div>
 
+                <!-- 파일 업로드 영역 -->
+                <div class="p-4 border-b border-gray-200">
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">새 파일 업로드</h3>
+                    <div id="mobile-info-upload-area" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-all duration-200">
+                        <div class="mb-3">
+                            <svg class="mx-auto h-8 w-8 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
+                        <p class="text-sm mb-2">파일을 드래그하거나 클릭</p>
+                        <p class="text-xs text-gray-500 mb-3">.txt 파일만 업로드 가능</p>
+                        <input type="file" id="mobile-info-file-input" accept=".txt" class="hidden">
+                        <button id="mobile-info-upload-btn" class="bg-kakao-yellow text-kakao-brown px-4 py-2 rounded-lg text-sm font-semibold hover:bg-yellow-400 transition-colors">파일 선택</button>
+                    </div>
+                </div>
+
+                <!-- 에러 메시지 -->
+                <div id="mobile-info-error-message" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded m-4 text-sm"></div>
+
+                <!-- 로딩 상태 -->
+                <div id="mobile-info-loading" class="hidden p-4 text-center border-b border-gray-200">
+                    <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-kakao-yellow"></div>
+                    <p class="mt-2 text-sm text-gray-600">분석 중...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 오른쪽 검색 사이드바 (PC에서만 표시) -->
+        <div id="search-sidebar" class="hidden lg:flex w-80 min-w-80 max-w-80 bg-white border-l border-gray-200 flex-col h-screen">
+            <!-- 검색 패널 -->
+            <div class="flex flex-col h-full">
+                <!-- 검색 헤더 -->
+                <div class="p-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">대화내용 검색</h3>
+                    
+                    <!-- 검색 입력창과 달력 아이콘 -->
+                    <div class="flex items-center space-x-3">
+                        <div class="relative flex-1">
+                            <input type="text" id="search-input" 
+                                   class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-kakao-yellow focus:border-kakao-yellow"
+                                   placeholder="대화내용 검색">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <button id="date-filter-btn" class="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors relative group">
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <!-- 툴팁 -->
+                            <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                날짜 필터
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                            </div>
+                        </button>
+                    </div>
+                    
+                    <!-- 검색 버튼 -->
+                    <button id="integrated-search" class="mt-3 w-full bg-kakao-yellow text-kakao-brown py-2 px-4 rounded-lg hover:bg-yellow-400 transition-colors text-sm font-medium">
+                        검색
+                    </button>
+                    
+                </div>
+                
                 <!-- 검색 결과 영역 -->
                 <div class="flex-1 overflow-y-auto">
+                    <!-- 달력 팝업 -->
+                    <div id="calendar-popup" class="hidden p-4 border-b border-gray-200">
+                        <div class="bg-white border border-gray-200 rounded-lg shadow-lg p-4 relative">
+                            <!-- 닫기 버튼 -->
+                            <button id="close-calendar" class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 transition-colors" title="달력 닫기">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                            
+                            <div class="flex items-center justify-between mb-4 mt-6">
+                                <button id="prev-month" class="p-1 text-gray-500 hover:text-gray-700">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                    </svg>
+                                </button>
+                                <h3 id="calendar-month-year" class="text-lg font-semibold text-gray-800"></h3>
+                                <button id="next-month" class="p-1 text-gray-500 hover:text-gray-700">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <!-- 요일 헤더 -->
+                            <div class="grid grid-cols-7 gap-1 mb-2">
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">일</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">월</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">화</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">수</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">목</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">금</div>
+                                <div class="text-center text-xs font-medium text-gray-500 py-2">토</div>
+                            </div>
+                            
+                            <!-- 날짜 그리드 -->
+                            <div id="calendar-grid" class="grid grid-cols-7 gap-1">
+                                <!-- 달력 날짜들이 동적으로 생성됩니다 -->
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- 검색 로딩 -->
                     <div id="search-loading" class="hidden p-4">
                         <div class="flex items-center justify-center py-8">
@@ -401,7 +669,7 @@
                             <span class="text-gray-600 text-sm">검색 중...</span>
                         </div>
                     </div>
-
+                    
                     <div id="search-results" class="p-4">
                         <div class="text-center text-gray-500 text-sm py-8">
                             검색어를 입력해주세요
@@ -410,7 +678,7 @@
                 </div>
             </div>
         </div>
-
+        
         </div>
 
     <!-- JavaScript -->
