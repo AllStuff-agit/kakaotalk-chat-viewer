@@ -309,13 +309,39 @@
 
             <!-- 초기 안내 화면 -->
             <div id="welcome-screen" class="flex-1 flex items-center justify-center bg-white">
-                <div class="text-center text-gray-500">
-                    <div class="text-6xl mb-4">💞</div>
-                    <h2 class="text-2xl font-semibold mb-2 text-gray-700">카카오톡 채팅방 뷰어</h2>
-                    <p class="text-gray-500">
-                        <span class="hidden lg:inline">왼쪽 사이드바에서 채팅 파일을 업로드해주세요</span>
-                        <span class="lg:hidden">메뉴 버튼을 눌러 채팅 파일을 업로드해주세요</span>
-                    </p>
+                <div class="w-full max-w-md mx-auto px-6">
+                    <div class="text-center text-gray-500 mb-8">
+                        <div class="text-6xl mb-4">💞</div>
+                        <h2 class="text-2xl font-semibold mb-2 text-gray-700">카카오톡 채팅방 뷰어</h2>
+                        <p class="text-gray-500 mb-6">
+                            <span class="hidden lg:inline">왼쪽 사이드바에서 채팅 파일을 업로드해주세요</span>
+                            <span class="lg:hidden">채팅 파일을 업로드해주세요</span>
+                        </p>
+                    </div>
+
+                    <!-- 모바일/태블릿용 파일 업로드 영역 -->
+                    <div class="lg:hidden">
+                        <div id="mobile-upload-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-all duration-200">
+                            <div class="mb-4">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
+                            <p class="text-lg mb-2 font-medium text-gray-700">파일을 드래그하거나 클릭</p>
+                            <p class="text-sm text-gray-500 mb-4">.txt 파일만 업로드 가능</p>
+                            <input type="file" id="mobile-file-input" accept=".txt" class="hidden">
+                            <button id="mobile-upload-btn" class="bg-kakao-yellow text-kakao-brown px-6 py-3 rounded-lg text-base font-semibold hover:bg-yellow-400 transition-colors">파일 선택</button>
+                        </div>
+
+                        <!-- 모바일용 에러 메시지 -->
+                        <div id="mobile-error-message" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mt-4 text-sm"></div>
+
+                        <!-- 모바일용 로딩 상태 -->
+                        <div id="mobile-loading" class="hidden text-center mt-6">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-kakao-yellow"></div>
+                            <p class="mt-3 text-sm text-gray-600">분석 중...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             

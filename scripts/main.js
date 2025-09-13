@@ -55,6 +55,9 @@ class KakaoTalkViewer {
         
         // 모바일 검색 기능
         this.initMobileSearch();
+
+        // 모바일/태블릿용 파일 업로드 기능
+        this.initMobileFileUpload();
     }
     
     /**
@@ -231,10 +234,14 @@ class KakaoTalkViewer {
      */
     showLoading(show) {
         const loading = document.getElementById('loading');
+        const mobileLoading = document.getElementById('mobile-loading');
+
         if (show) {
-            loading.classList.remove('hidden');
+            if (loading) loading.classList.remove('hidden');
+            if (mobileLoading) mobileLoading.classList.remove('hidden');
         } else {
-            loading.classList.add('hidden');
+            if (loading) loading.classList.add('hidden');
+            if (mobileLoading) mobileLoading.classList.add('hidden');
         }
     }
     
@@ -244,15 +251,27 @@ class KakaoTalkViewer {
      */
     showError(message) {
         const errorDiv = document.getElementById('error-message');
-        errorDiv.textContent = message;
-        errorDiv.classList.remove('hidden');
+        const mobileErrorDiv = document.getElementById('mobile-error-message');
+
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+        if (mobileErrorDiv) {
+            mobileErrorDiv.textContent = message;
+            mobileErrorDiv.classList.remove('hidden');
+        }
     }
     
     /**
      * 에러 메시지 숨기기
      */
     hideError() {
-        document.getElementById('error-message').classList.add('hidden');
+        const errorDiv = document.getElementById('error-message');
+        const mobileErrorDiv = document.getElementById('mobile-error-message');
+
+        if (errorDiv) errorDiv.classList.add('hidden');
+        if (mobileErrorDiv) mobileErrorDiv.classList.add('hidden');
     }
     
     /**
@@ -990,10 +1009,9 @@ KakaoTalkViewer.prototype.initMobileSearch = function() {
         const mobileSearchPanel = document.getElementById('mobile-search-panel');
         const mobileSearchClose = document.getElementById('mobile-search-close');
         const mobileSearchInput = document.getElementById('mobile-search-input');
-        const mobileSearchSubmit = document.getElementById('mobile-search-submit');
-        const mobileCalendarBtn = document.getElementById('mobile-calendar-btn');
+        const mobileSearchSubmit = document.getElementById('mobile-integrated-search');
+        const mobileCalendarBtn = document.getElementById('mobile-date-filter-btn');
         const mobileCalendarPopup = document.getElementById('mobile-calendar-popup');
-        const mobileCalendarClose = document.getElementById('mobile-calendar-close');
         
         // 검색 패널 열기
         if (mobileSearchBtn && mobileSearchPanel) {
@@ -1043,18 +1061,23 @@ KakaoTalkViewer.prototype.initMobileSearch = function() {
         
         // 모바일 달력 열기
         if (mobileCalendarBtn && mobileCalendarPopup) {
-            mobileCalendarBtn.addEventListener('click', () => {
-                mobileCalendarPopup.classList.remove('hidden');
-                this.createMobileCalendar();
+            mobileCalendarBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                mobileCalendarPopup.classList.toggle('hidden');
+                if (!mobileCalendarPopup.classList.contains('hidden')) {
+                    this.renderMobileCalendar();
+                }
             });
         }
-        
-        // 모바일 달력 닫기
-        if (mobileCalendarClose && mobileCalendarPopup) {
-            mobileCalendarClose.addEventListener('click', () => {
-                mobileCalendarPopup.classList.add('hidden');
-            });
-        }
+
+        // 모바일 달력 외부 클릭시 닫기
+        document.addEventListener('click', (e) => {
+            if (mobileCalendarPopup && !mobileCalendarPopup.classList.contains('hidden')) {
+                if (!mobileCalendarPopup.contains(e.target) && e.target !== mobileCalendarBtn) {
+                    mobileCalendarPopup.classList.add('hidden');
+                }
+            }
+        });
 };
 
 /**
@@ -1199,9 +1222,9 @@ KakaoTalkViewer.prototype.scrollToMobileSearchResult = function(messageIndex) {
 };
 
 /**
- * 모바일 달력 생성
+ * 모바일 달력 렌더링
  */
-KakaoTalkViewer.prototype.createMobileCalendar = function() {
+KakaoTalkViewer.prototype.renderMobileCalendar = function() {
         const mobileCalendarContainer = document.getElementById('mobile-calendar-container');
         if (!mobileCalendarContainer || !this.currentChatData) return;
         
@@ -1269,32 +1292,32 @@ KakaoTalkViewer.prototype.createMobileCalendar = function() {
  */
 KakaoTalkViewer.prototype.jumpToMobileDate = function(dateString) {
         if (!this.currentChatData) return;
-        
+
         // "2025-05-20" 형태를 "2025년 5월 20일" 형태로 변환
         const [year, month, day] = dateString.split('-');
         const targetDate = `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
-        
+
         for (let i = 0; i < this.currentChatData.messages.length; i++) {
             const message = this.currentChatData.messages[i];
             if (message.type === 'date' && message.date.includes(targetDate)) {
                 const chatMessages = document.getElementById('chat-messages');
                 const messageElements = chatMessages.children;
-                
+
                 if (i < messageElements.length) {
-                    messageElements[i].scrollIntoView({ 
-                        behavior: 'smooth', 
-                        block: 'start' 
+                    messageElements[i].scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
                     });
-                    
+
                     // 하이라이트 효과
                     setTimeout(() => {
                         const previousHighlight = chatMessages.querySelector('.search-highlight');
                         if (previousHighlight) {
                             previousHighlight.classList.remove('search-highlight');
                         }
-                        
+
                         messageElements[i].classList.add('search-highlight');
-                        
+
                         // 하이라이트 자동 제거
                         setTimeout(() => {
                             messageElements[i].classList.remove('search-highlight');
@@ -1304,6 +1327,75 @@ KakaoTalkViewer.prototype.jumpToMobileDate = function(dateString) {
                 break;
             }
         }
+};
+
+/**
+ * 모바일/태블릿용 파일 업로드 기능 초기화
+ */
+KakaoTalkViewer.prototype.initMobileFileUpload = function() {
+    const mobileFileInput = document.getElementById('mobile-file-input');
+    const mobileUploadBtn = document.getElementById('mobile-upload-btn');
+    const mobileUploadArea = document.getElementById('mobile-upload-area');
+
+    // 모바일 파일 선택 버튼
+    if (mobileUploadBtn && mobileFileInput) {
+        mobileUploadBtn.addEventListener('click', () => {
+            mobileFileInput.click();
+        });
+    }
+
+    // 모바일 파일 입력 변경
+    if (mobileFileInput) {
+        mobileFileInput.addEventListener('change', (e) => {
+            this.handleFileSelect(e);
+        });
+    }
+
+    // 모바일 드래그 앤 드롭
+    if (mobileUploadArea) {
+        mobileUploadArea.addEventListener('dragover', (e) => this.handleMobileDragOver(e));
+        mobileUploadArea.addEventListener('dragleave', (e) => this.handleMobileDragLeave(e));
+        mobileUploadArea.addEventListener('drop', (e) => this.handleMobileDrop(e));
+        mobileUploadArea.addEventListener('click', () => {
+            if (mobileFileInput) mobileFileInput.click();
+        });
+    }
+};
+
+/**
+ * 모바일 드래그 오버 핸들링
+ * @param {Event} e - 드래그 이벤트
+ */
+KakaoTalkViewer.prototype.handleMobileDragOver = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    document.getElementById('mobile-upload-area').classList.add('drag-over');
+};
+
+/**
+ * 모바일 드래그 리브 핸들링
+ * @param {Event} e - 드래그 이벤트
+ */
+KakaoTalkViewer.prototype.handleMobileDragLeave = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    document.getElementById('mobile-upload-area').classList.remove('drag-over');
+};
+
+/**
+ * 모바일 파일 드롭 핸들링
+ * @param {Event} e - 드롭 이벤트
+ */
+KakaoTalkViewer.prototype.handleMobileDrop = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    document.getElementById('mobile-upload-area').classList.remove('drag-over');
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        this.processFile(files[0]);
+    }
 };
 
 // 애플리케이션 초기화
