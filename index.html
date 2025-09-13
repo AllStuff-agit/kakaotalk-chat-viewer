@@ -74,6 +74,29 @@
             transform: translateX(-50%) translateY(-10px);
             transition: all 0.3s ease-in;
         }
+        
+        /* 검색 하이라이트 효과 (깜빡임 없음) */
+        .search-highlight {
+            background-color: rgba(255, 235, 59, 0.5) !important;
+            border: 2px solid rgba(255, 193, 7, 0.9);
+            border-radius: 12px;
+            padding: 4px;
+            margin: -4px;
+            box-shadow: 0 0 25px rgba(255, 193, 7, 0.7);
+            transform: scale(1.02);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* 폰트 크기 조절 클래스들 */
+        .font-size-10 { font-size: 10px !important; line-height: 1.4 !important; }
+        .font-size-12 { font-size: 12px !important; line-height: 1.4 !important; }
+        .font-size-14 { font-size: 14px !important; line-height: 1.4 !important; }
+        .font-size-16 { font-size: 16px !important; line-height: 1.5 !important; }
+        .font-size-18 { font-size: 18px !important; line-height: 1.5 !important; }
+        .font-size-20 { font-size: 20px !important; line-height: 1.5 !important; }
+        .font-size-22 { font-size: 22px !important; line-height: 1.5 !important; }
+        .font-size-24 { font-size: 24px !important; line-height: 1.6 !important; }
+        
     </style>
 </head>
 <body class="bg-gray-100 font-kakao">
@@ -168,7 +191,32 @@
                         </div>
                         
                         <!-- 오른쪽: 아이콘들 -->
-                        <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-2">
+                            <!-- 폰트 크기 조절 -->
+                            <div class="flex items-center space-x-1 bg-gray-100 rounded-lg px-2 py-1">
+                                <button id="font-size-decrease" class="w-6 h-6 text-gray-600 hover:text-gray-800 hover:bg-gray-200 active:bg-gray-300 active:scale-95 transition-all duration-150 flex items-center justify-center rounded">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                                    </svg>
+                                </button>
+                                <div class="relative min-w-[24px] flex items-center justify-center group">
+                                    <span id="font-size-indicator" class="text-xs text-gray-500 text-center font-medium">14</span>
+                                    <div id="font-size-loading" class="hidden absolute inset-0 flex items-center justify-center">
+                                        <div class="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent"></div>
+                                    </div>
+                                    <!-- 툴팁 -->
+                                    <div class="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                        폰트 크기
+                                        <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-800"></div>
+                                    </div>
+                                </div>
+                                <button id="font-size-increase" class="w-6 h-6 text-gray-600 hover:text-gray-800 hover:bg-gray-200 active:bg-gray-300 active:scale-95 transition-all duration-150 flex items-center justify-center rounded">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            
                             <!-- 메뉴 아이콘 -->
                             <button class="w-6 h-6 text-gray-600 hover:text-gray-800 transition-colors" title="메뉴">
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,8 +234,18 @@
                     </div>
                 </div>
                 
+                <!-- 스크롤 이동 로딩 인디케이터 -->
+                <div id="scroll-loading-indicator" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20">
+                    <div class="bg-white bg-opacity-95 border border-gray-300 rounded-lg px-4 py-3 shadow-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-kakao-yellow"></div>
+                            <span class="text-sm text-gray-700 font-medium">이동 중...</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- 채팅 메시지 영역 -->
-                <div id="chat-messages" class="bg-chat-bg flex-1 overflow-y-auto px-6 py-4">
+                <div id="chat-messages" class="bg-chat-bg flex-1 overflow-y-auto px-6 py-4 font-size-14">
                     <!-- 메시지들이 여기에 동적으로 추가됩니다 -->
                 </div>
                 
@@ -220,11 +278,16 @@
                                 </svg>
                             </button>
                             
-                            <!-- 전송 버튼 -->
-                            <button class="w-8 h-8 bg-kakao-yellow rounded-full flex items-center justify-center text-kakao-brown hover:bg-yellow-400 transition-colors" disabled>
+                            <!-- 맨 아래로 이동 버튼 -->
+                            <button id="scroll-to-bottom-btn" class="w-8 h-8 bg-kakao-yellow rounded-full flex items-center justify-center text-kakao-brown hover:bg-yellow-400 transition-colors relative group">
                                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z"/>
+                                    <path d="M19 14l-7 7m0 0l-7-7m7 7V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
                                 </svg>
+                                <!-- 툴팁 -->
+                                <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                    맨 아래로 이동
+                                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                                </div>
                             </button>
                         </div>
                     </div>
@@ -261,10 +324,15 @@
                                 </svg>
                             </div>
                         </div>
-                        <button id="date-filter-btn" class="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="날짜 필터">
+                        <button id="date-filter-btn" class="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors relative group">
                             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                             </svg>
+                            <!-- 툴팁 -->
+                            <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                날짜 필터
+                                <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                            </div>
                         </button>
                     </div>
                     

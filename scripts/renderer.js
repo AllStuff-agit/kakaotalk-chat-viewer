@@ -13,6 +13,8 @@ class ChatRenderer {
         this.users = []; // 사용자 목록
         this.dateElements = []; // 날짜 요소들 저장
         this.scrollTimeout = null; // 스크롤 타임아웃
+        
+        
         this.setupScrollDateIndicator();
     }
 
@@ -31,6 +33,7 @@ class ChatRenderer {
         }
         this.setupUserButtons(chatData);
         
+        // 모든 메시지를 한번에 렌더링
         chatData.messages.forEach((message, index) => {
             if (message.type === 'date') {
                 this.renderDateSeparator(message);
@@ -39,10 +42,26 @@ class ChatRenderer {
             }
         });
         
+        this.finishRendering(isInitial);
+    }
+    
+    
+    /**
+     * 렌더링 완료 후 처리
+     */
+    finishRendering(isInitial) {
         // 스크롤을 맨 아래로 (DOM 렌더링 완료 후)
-        setTimeout(() => {
-            this.scrollToBottom();
-        }, 100);
+        if (isInitial) {
+            // 초기 렌더링 시 로딩 인디케이터와 함께 스크롤
+            setTimeout(() => {
+                this.scrollToBottomWithLoading();
+            }, 100);
+        } else {
+            // 사용자 변경 시에는 바로 스크롤
+            setTimeout(() => {
+                this.scrollToBottom();
+            }, 100);
+        }
         
         // 채팅방 헤더 업데이트
         this.updateChatHeader();
@@ -57,6 +76,7 @@ class ChatRenderer {
             this.attachScrollListener();
         }
     }
+    
     
     /**
      * 현재 사용자 추정 (채팅방 제목에서 첫 번째 사람을 기본으로)
@@ -461,6 +481,19 @@ class ChatRenderer {
     /**
      * 채팅창을 맨 아래로 스크롤
      */
+    scrollToBottomWithLoading() {
+        if (!this.container) return;
+        
+        // 스크롤을 부드럽게 맨 아래로
+        this.container.scrollTo({
+            top: this.container.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+    
+    /**
+     * 채팅창을 맨 아래로 스크롤
+     */
     scrollToBottom() {
         if (!this.container) return;
         
@@ -484,15 +517,39 @@ class ChatRenderer {
      * 스크롤 리스너 연결
      */
     attachScrollListener() {
+        // 스크롤 이벤트 쓰로틀링 (대용량 데이터 최적화)
+        let scrollTimeout;
         this.container.addEventListener('scroll', () => {
-            this.handleScroll();
+            if (scrollTimeout) return;
+            
+            scrollTimeout = setTimeout(() => {
+                this.handleScroll();
+                scrollTimeout = null;
+            }, 50);
         });
+        
+        // DOM이 완전히 로드된 후 버튼 이벤트 연결
+        setTimeout(() => {
+            const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+            if (scrollToBottomBtn) {
+                scrollToBottomBtn.addEventListener('click', () => {
+                    this.scrollToBottomWithLoading();
+                });
+            }
+        }, 100);
     }
     
     /**
-     * 스크롤 이벤트 처리
+     * 스크롤 이벤트 처리 (최적화됨)
      */
     handleScroll() {
+        // 대용량 데이터일 때 일부 기능 제한
+        if (this.isLargeDataset && this.dateElements.length > 100) {
+            // 날짜 표시 기능 간소화
+            this.handleScrollLightweight();
+            return;
+        }
+        
         const scrollDateIndicator = document.getElementById('scroll-date-indicator');
         const currentScrollDate = document.getElementById('current-scroll-date');
         
@@ -534,6 +591,36 @@ class ChatRenderer {
             }, 3000);
         }
     }
+    
+    /**
+     * 경량화된 스크롤 처리 (대용량 데이터용)
+     */
+    handleScrollLightweight() {
+        // 최소한의 날짜 표시만 처리
+        const scrollDateIndicator = document.getElementById('scroll-date-indicator');
+        const currentScrollDate = document.getElementById('current-scroll-date');
+        
+        if (!scrollDateIndicator || !currentScrollDate) {
+            return;
+        }
+        
+        // 스크롤 위치 기반으로 대략적인 날짜 추정
+        const scrollPercentage = this.container.scrollTop / (this.container.scrollHeight - this.container.clientHeight);
+        const dateIndex = Math.floor(scrollPercentage * this.dateElements.length);
+        
+        if (dateIndex < this.dateElements.length && this.dateElements[dateIndex]) {
+            currentScrollDate.textContent = this.dateElements[dateIndex].date;
+            scrollDateIndicator.classList.remove('scroll-date-hide');
+            scrollDateIndicator.classList.add('scroll-date-show');
+            
+            clearTimeout(this.scrollTimeout);
+            this.scrollTimeout = setTimeout(() => {
+                scrollDateIndicator.classList.remove('scroll-date-show');
+                scrollDateIndicator.classList.add('scroll-date-hide');
+            }, 2000); // 대용량에서는 더 빨리 숨김
+        }
+    }
+    
 }
 
 // 전역으로 클래스 내보내기

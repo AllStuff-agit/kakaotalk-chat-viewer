@@ -38,6 +38,10 @@ class KakaoTalkViewer {
         // 달력 기능
         this.initCalendarListeners();
         this.availableDates = new Set(); // 채팅 데이터에 있는 날짜들
+        
+        // 폰트 크기 조절 기능
+        this.initFontSizeControls();
+        this.currentFontSize = 14; // 기본 폰트 크기
     }
     
     /**
@@ -245,9 +249,8 @@ class KakaoTalkViewer {
         const searchInput = document.getElementById('search-input');
         const integratedSearch = document.getElementById('integrated-search');
         
-        // 검색 입력
+        // 검색 입력 - Enter 키 입력 시 검색
         if (searchInput) {
-            searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
             searchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     this.handleSearch(e.target.value);
@@ -255,13 +258,11 @@ class KakaoTalkViewer {
             });
         }
         
-        // 통합검색 버튼
+        // 통합검색 버튼 - 클릭 시 검색
         if (integratedSearch) {
             integratedSearch.addEventListener('click', () => {
                 const query = searchInput.value;
-                if (query) {
-                    this.handleSearch(query);
-                }
+                this.handleSearch(query);
             });
         }
     }
@@ -508,6 +509,9 @@ class KakaoTalkViewer {
         const searchResults = document.getElementById('search-results');
         const searchLoading = document.getElementById('search-loading');
         
+        // 달력을 열 때마다 오늘 날짜로 초기화
+        this.currentCalendarDate = new Date();
+        
         // 검색 관련 요소 숨기고 달력 표시
         searchResults.classList.add('hidden');
         searchLoading.classList.add('hidden');
@@ -650,16 +654,224 @@ class KakaoTalkViewer {
                 if (i < messageElements.length) {
                     messageElements[i].scrollIntoView({ behavior: 'smooth', block: 'start' });
                     
-                    // 날짜 구분선 하이라이트 효과
-                    messageElements[i].classList.add('animate-pulse', 'bg-yellow-100');
+                    // 스크롤 완료 후 하이라이트 효과 적용 (약간의 지연)
                     setTimeout(() => {
-                        messageElements[i].classList.remove('animate-pulse', 'bg-yellow-100');
-                    }, 2000);
+                        // 기존 하이라이트 제거
+                        const previousHighlight = chatMessages.querySelector('.search-highlight');
+                        if (previousHighlight) {
+                            previousHighlight.classList.remove('search-highlight');
+                        }
+                        
+                        // 날짜 구분선 하이라이트 효과 (검색 결과와 동일한 효과)
+                        messageElements[i].classList.add('search-highlight');
+                        
+                        // 전역 클릭 리스너 추가 (한 번만)
+                        if (!window.searchHighlightListenerAdded) {
+                            window.searchHighlightListenerAdded = true;
+                            document.addEventListener('click', function removeHighlight(e) {
+                                // 검색 사이드바나 달력 클릭은 무시
+                                const searchSidebar = document.getElementById('search-sidebar');
+                                const calendarPopup = document.getElementById('calendar-popup');
+                                if ((searchSidebar && searchSidebar.contains(e.target)) || 
+                                    (calendarPopup && calendarPopup.contains(e.target))) {
+                                    return;
+                                }
+                                
+                                // 하이라이트 제거
+                                const highlighted = chatMessages.querySelector('.search-highlight');
+                                if (highlighted) {
+                                    highlighted.classList.remove('search-highlight');
+                                }
+                                
+                                // 이벤트 리스너 제거
+                                document.removeEventListener('click', removeHighlight);
+                                window.searchHighlightListenerAdded = false;
+                            });
+                        }
+                    }, 300); // 300ms 후에 하이라이트 적용
                 }
                 
-                // 달력 닫기
-                this.hideCalendar();
+                // 달력은 열어두고 스크롤만 실행 (달력 닫기 제거)
                 break;
+            }
+        }
+    }
+    
+    /**
+     * 폰트 크기 조절 기능 초기화
+     */
+    initFontSizeControls() {
+        const decreaseBtn = document.getElementById('font-size-decrease');
+        const increaseBtn = document.getElementById('font-size-increase');
+        const indicator = document.getElementById('font-size-indicator');
+        
+        if (decreaseBtn) {
+            decreaseBtn.addEventListener('click', () => this.decreaseFontSize());
+        }
+        
+        if (increaseBtn) {
+            increaseBtn.addEventListener('click', () => this.increaseFontSize());
+        }
+        
+        // 로컬 스토리지에서 저장된 폰트 크기 불러오기
+        const savedFontSize = localStorage.getItem('kakao-chat-font-size');
+        if (savedFontSize) {
+            this.currentFontSize = parseInt(savedFontSize);
+            this.updateFontSize();
+        }
+    }
+    
+    /**
+     * 폰트 크기 줄이기
+     */
+    decreaseFontSize() {
+        const fontSizes = [10, 12, 14, 16, 18, 20, 22, 24];
+        const currentIndex = fontSizes.indexOf(this.currentFontSize);
+        
+        if (currentIndex > 0) {
+            this.showFontSizeLoading();
+            this.currentFontSize = fontSizes[currentIndex - 1];
+            
+            // 약간의 지연 후 적용 (실제 처리 시뮬레이션)
+            setTimeout(() => {
+                this.updateFontSize();
+                this.hideFontSizeLoading();
+            }, 300);
+        }
+    }
+    
+    /**
+     * 폰트 크기 키우기
+     */
+    increaseFontSize() {
+        const fontSizes = [10, 12, 14, 16, 18, 20, 22, 24];
+        const currentIndex = fontSizes.indexOf(this.currentFontSize);
+        
+        if (currentIndex < fontSizes.length - 1) {
+            this.showFontSizeLoading();
+            this.currentFontSize = fontSizes[currentIndex + 1];
+            
+            // 약간의 지연 후 적용 (실제 처리 시뮬레이션)
+            setTimeout(() => {
+                this.updateFontSize();
+                this.hideFontSizeLoading();
+            }, 300);
+        }
+    }
+    
+    /**
+     * 폰트 크기 로딩 표시
+     */
+    showFontSizeLoading() {
+        const indicator = document.getElementById('font-size-indicator');
+        const loading = document.getElementById('font-size-loading');
+        const decreaseBtn = document.getElementById('font-size-decrease');
+        const increaseBtn = document.getElementById('font-size-increase');
+        
+        if (indicator && loading) {
+            indicator.style.opacity = '0';
+            loading.classList.remove('hidden');
+        }
+        
+        // 버튼들 비활성화
+        if (decreaseBtn) {
+            decreaseBtn.disabled = true;
+            decreaseBtn.style.opacity = '0.5';
+            decreaseBtn.style.cursor = 'not-allowed';
+        }
+        
+        if (increaseBtn) {
+            increaseBtn.disabled = true;
+            increaseBtn.style.opacity = '0.5';
+            increaseBtn.style.cursor = 'not-allowed';
+        }
+    }
+    
+    /**
+     * 폰트 크기 로딩 숨기기
+     */
+    hideFontSizeLoading() {
+        const indicator = document.getElementById('font-size-indicator');
+        const loading = document.getElementById('font-size-loading');
+        const decreaseBtn = document.getElementById('font-size-decrease');
+        const increaseBtn = document.getElementById('font-size-increase');
+        
+        if (indicator && loading) {
+            loading.classList.add('hidden');
+            indicator.style.opacity = '1';
+            
+            // 완료 애니메이션
+            indicator.style.transform = 'scale(1.1)';
+            indicator.style.color = '#10B981'; // 초록색으로 잠깐 변경
+            
+            setTimeout(() => {
+                indicator.style.transform = 'scale(1)';
+                indicator.style.color = '#6B7280'; // 원래 회색으로
+            }, 400);
+        }
+        
+        // 버튼들 다시 활성화
+        if (decreaseBtn) {
+            decreaseBtn.disabled = false;
+        }
+        
+        if (increaseBtn) {
+            increaseBtn.disabled = false;
+        }
+    }
+    
+    /**
+     * 폰트 크기 업데이트 적용
+     */
+    updateFontSize() {
+        const chatMessages = document.getElementById('chat-messages');
+        const indicator = document.getElementById('font-size-indicator');
+        
+        if (chatMessages) {
+            // 기존 폰트 크기 클래스들 제거
+            chatMessages.className = chatMessages.className.replace(/font-size-\d+/g, '');
+            
+            // 새로운 폰트 크기 클래스 추가
+            chatMessages.classList.add(`font-size-${this.currentFontSize}`);
+        }
+        
+        if (indicator) {
+            // 숫자 변경 애니메이션과 함께 업데이트
+            indicator.style.transition = 'all 0.15s ease-out';
+            indicator.textContent = this.currentFontSize;
+        }
+        
+        // 로컬 스토리지에 저장
+        localStorage.setItem('kakao-chat-font-size', this.currentFontSize.toString());
+        
+        // 버튼 상태 업데이트
+        this.updateButtonStates();
+    }
+    
+    /**
+     * 버튼 상태 업데이트 (최소/최대에서 비활성화)
+     */
+    updateButtonStates() {
+        const decreaseBtn = document.getElementById('font-size-decrease');
+        const increaseBtn = document.getElementById('font-size-increase');
+        
+        if (decreaseBtn) {
+            if (this.currentFontSize <= 10) {
+                decreaseBtn.style.opacity = '0.5';
+                decreaseBtn.style.cursor = 'not-allowed';
+            } else {
+                decreaseBtn.style.opacity = '1';
+                decreaseBtn.style.cursor = 'pointer';
+            }
+        }
+        
+        if (increaseBtn) {
+            if (this.currentFontSize >= 24) {
+                increaseBtn.style.opacity = '0.5';
+                increaseBtn.style.cursor = 'not-allowed';
+            } else {
+                increaseBtn.style.opacity = '1';
+                increaseBtn.style.cursor = 'pointer';
             }
         }
     }
@@ -672,13 +884,43 @@ window.scrollToMessage = function(messageIndex) {
     
     if (messageIndex < messageElements.length) {
         const targetElement = messageElements[messageIndex];
+        
+        // 스크롤 시작
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         
-        // 잠시 하이라이트 효과
-        targetElement.classList.add('animate-pulse', 'bg-yellow-100');
+        // 스크롤 완료 후 하이라이트 효과 적용 (약간의 지연)
         setTimeout(() => {
-            targetElement.classList.remove('animate-pulse', 'bg-yellow-100');
-        }, 2000);
+            // 기존 하이라이트 제거
+            const previousHighlight = chatMessages.querySelector('.search-highlight');
+            if (previousHighlight) {
+                previousHighlight.classList.remove('search-highlight');
+            }
+            
+            // 새로운 하이라이트 효과 (클릭하기 전까지 유지)
+            targetElement.classList.add('search-highlight');
+            
+            // 전역 클릭 리스너 추가 (한 번만)
+            if (!window.searchHighlightListenerAdded) {
+                window.searchHighlightListenerAdded = true;
+                document.addEventListener('click', function removeHighlight(e) {
+                    // 검색 사이드바 클릭은 무시
+                    const searchSidebar = document.getElementById('search-sidebar');
+                    if (searchSidebar && searchSidebar.contains(e.target)) {
+                        return;
+                    }
+                    
+                    // 하이라이트 제거
+                    const highlighted = chatMessages.querySelector('.search-highlight');
+                    if (highlighted) {
+                        highlighted.classList.remove('search-highlight');
+                    }
+                    
+                    // 이벤트 리스너 제거
+                    document.removeEventListener('click', removeHighlight);
+                    window.searchHighlightListenerAdded = false;
+                });
+            }
+        }, 300); // 300ms 후에 하이라이트 적용
     }
 };
 
