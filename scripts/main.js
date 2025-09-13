@@ -22,15 +22,25 @@ class KakaoTalkViewer {
         const uploadArea = document.getElementById('upload-area');
         
         // 파일 선택 버튼
-        uploadBtn.addEventListener('click', () => fileInput.click());
+        if (uploadBtn && fileInput) {
+            uploadBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+        }
         
         // 파일 입력 변경
-        fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                this.handleFileSelect(e);
+            });
+        }
         
         // 드래그 앤 드롭
-        uploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
-        uploadArea.addEventListener('dragleave', (e) => this.handleDragLeave(e));
-        uploadArea.addEventListener('drop', (e) => this.handleDrop(e));
+        if (uploadArea) {
+            uploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
+            uploadArea.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+            uploadArea.addEventListener('drop', (e) => this.handleDrop(e));
+        }
         
         // 검색 기능
         this.initSearchListeners();
@@ -925,11 +935,57 @@ window.scrollToMessage = function(messageIndex) {
             }
         }, 300); // 300ms 후에 하이라이트 적용
     }
+}
+
+// 전역 함수 - 메시지로 스크롤
+window.scrollToMessage = function(messageIndex) {
+    const chatMessages = document.getElementById('chat-messages');
+    const messageElements = chatMessages.children;
     
-    /**
-     * 모바일 검색 기능 초기화
-     */
-    initMobileSearch() {
+    if (messageIndex < messageElements.length) {
+        const targetElement = messageElements[messageIndex];
+        
+        // 스크롤 시작
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // 스크롤 완료 후 하이라이트 효과 적용 (약간의 지연)
+        setTimeout(() => {
+            // 기존 하이라이트 제거
+            const previousHighlight = chatMessages.querySelector('.search-highlight');
+            if (previousHighlight) {
+                previousHighlight.classList.remove('search-highlight');
+            }
+            
+            // 새로운 하이라이트 효과 (클릭하기 전까지 유지)
+            targetElement.classList.add('search-highlight');
+            
+            // 전역 클릭 리스너 추가 (한 번만)
+            if (!window.searchHighlightListenerAdded) {
+                window.searchHighlightListenerAdded = true;
+                document.addEventListener('click', function removeHighlight(e) {
+                    // 검색 사이드바 클릭은 무시
+                    const searchSidebar = document.getElementById('search-sidebar');
+                    if (searchSidebar && searchSidebar.contains(e.target)) {
+                        return;
+                    }
+                    
+                    // 하이라이트 제거
+                    const highlighted = chatMessages.querySelector('.search-highlight');
+                    if (highlighted) {
+                        highlighted.classList.remove('search-highlight');
+                    }
+                    
+                    // 이벤트 리스너 제거
+                    document.removeEventListener('click', removeHighlight);
+                    window.searchHighlightListenerAdded = false;
+                });
+            }
+        }, 300); // 300ms 후에 하이라이트 적용
+    }
+};
+
+// KakaoTalkViewer 클래스의 확장 메서드들
+KakaoTalkViewer.prototype.initMobileSearch = function() {
         const mobileSearchBtn = document.getElementById('mobile-search-btn');
         const mobileSearchPanel = document.getElementById('mobile-search-panel');
         const mobileSearchClose = document.getElementById('mobile-search-close');
@@ -999,12 +1055,12 @@ window.scrollToMessage = function(messageIndex) {
                 mobileCalendarPopup.classList.add('hidden');
             });
         }
-    }
-    
-    /**
-     * 모바일 검색 실행
-     */
-    performMobileSearch(searchTerm) {
+};
+
+/**
+ * 모바일 검색 실행
+ */
+KakaoTalkViewer.prototype.performMobileSearch = function(searchTerm) {
         if (!this.currentChatData) return;
         
         const results = [];
@@ -1021,12 +1077,12 @@ window.scrollToMessage = function(messageIndex) {
         });
         
         this.displayMobileSearchResults(results, searchTerm);
-    }
-    
-    /**
-     * 모바일 검색 결과 표시
-     */
-    displayMobileSearchResults(results, searchTerm) {
+};
+
+/**
+ * 모바일 검색 결과 표시
+ */
+KakaoTalkViewer.prototype.displayMobileSearchResults = function(results, searchTerm) {
         const resultsContainer = document.getElementById('mobile-search-results');
         if (!resultsContainer) return;
         
@@ -1094,12 +1150,12 @@ window.scrollToMessage = function(messageIndex) {
                 }
             });
         });
-    }
-    
-    /**
-     * 모바일 검색 결과로 스크롤
-     */
-    scrollToMobileSearchResult(messageIndex) {
+};
+
+/**
+ * 모바일 검색 결과로 스크롤
+ */
+KakaoTalkViewer.prototype.scrollToMobileSearchResult = function(messageIndex) {
         if (!this.currentChatData) return;
         
         const chatMessages = document.getElementById('chat-messages');
@@ -1140,12 +1196,12 @@ window.scrollToMessage = function(messageIndex) {
                 }, 3000);
             }, 300);
         }
-    }
-    
-    /**
-     * 모바일 달력 생성
-     */
-    createMobileCalendar() {
+};
+
+/**
+ * 모바일 달력 생성
+ */
+KakaoTalkViewer.prototype.createMobileCalendar = function() {
         const mobileCalendarContainer = document.getElementById('mobile-calendar-container');
         if (!mobileCalendarContainer || !this.currentChatData) return;
         
@@ -1206,12 +1262,12 @@ window.scrollToMessage = function(messageIndex) {
                 }
             });
         });
-    }
-    
-    /**
-     * 모바일에서 특정 날짜로 이동
-     */
-    jumpToMobileDate(dateString) {
+};
+
+/**
+ * 모바일에서 특정 날짜로 이동
+ */
+KakaoTalkViewer.prototype.jumpToMobileDate = function(dateString) {
         if (!this.currentChatData) return;
         
         // "2025-05-20" 형태를 "2025년 5월 20일" 형태로 변환
@@ -1248,7 +1304,6 @@ window.scrollToMessage = function(messageIndex) {
                 break;
             }
         }
-    }
 };
 
 // 애플리케이션 초기화
