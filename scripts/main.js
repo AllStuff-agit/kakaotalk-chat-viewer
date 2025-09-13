@@ -60,6 +60,9 @@ class KakaoTalkViewer {
         // 모바일/태블릿용 파일 업로드 기능
         this.initMobileFileUpload();
 
+        // 모바일 정보 패널 파일 업로드 기능
+        this.initMobileInfoFileUpload();
+
         // 모바일 메뉴 시스템
         this.initMobileMenu();
     }
@@ -1418,13 +1421,17 @@ KakaoTalkViewer.prototype.initMobileFileUpload = function() {
     // 모바일 파일 선택 버튼
     if (mobileUploadBtn && mobileFileInput) {
         mobileUploadBtn.addEventListener('click', () => {
+            console.log('모바일 업로드 버튼 클릭됨');
             mobileFileInput.click();
         });
+    } else {
+        console.log('모바일 업로드 요소를 찾을 수 없음:', { mobileUploadBtn, mobileFileInput });
     }
 
     // 모바일 파일 입력 변경
     if (mobileFileInput) {
         mobileFileInput.addEventListener('change', (e) => {
+            console.log('모바일 파일 입력 변경됨:', e.target.files[0]);
             this.handleFileSelect(e);
         });
     }
@@ -1438,9 +1445,6 @@ KakaoTalkViewer.prototype.initMobileFileUpload = function() {
             if (mobileFileInput) mobileFileInput.click();
         });
     }
-
-    // 모바일 정보 패널 파일 업로드 기능
-    this.initMobileInfoFileUpload();
 };
 
 /**
@@ -1454,13 +1458,17 @@ KakaoTalkViewer.prototype.initMobileInfoFileUpload = function() {
     // 모바일 정보 패널 파일 선택 버튼
     if (mobileInfoUploadBtn && mobileInfoFileInput) {
         mobileInfoUploadBtn.addEventListener('click', () => {
+            console.log('모바일 정보 패널 업로드 버튼 클릭됨');
             mobileInfoFileInput.click();
         });
+    } else {
+        console.log('모바일 정보 패널 업로드 요소를 찾을 수 없음:', { mobileInfoUploadBtn, mobileInfoFileInput });
     }
 
     // 모바일 정보 패널 파일 입력 변경
     if (mobileInfoFileInput) {
         mobileInfoFileInput.addEventListener('change', (e) => {
+            console.log('모바일 정보 패널 파일 입력 변경됨:', e.target.files[0]);
             this.handleFileSelect(e);
         });
     }
