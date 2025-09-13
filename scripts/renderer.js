@@ -137,52 +137,67 @@ class ChatRenderer {
      */
     setupUserButtons(chatData) {
         const userButtonsContainer = document.getElementById('user-buttons');
-        
-        if (!userButtonsContainer) return;
-        
+        const mobileUserButtonsContainer = document.getElementById('mobile-user-buttons');
+
+        // PC용 버튼 생성
+        if (userButtonsContainer) {
+            this.createUserButtons(userButtonsContainer, false);
+        }
+
+        // 모바일용 버튼 생성
+        if (mobileUserButtonsContainer) {
+            this.createUserButtons(mobileUserButtonsContainer, true);
+        }
+    }
+
+    /**
+     * 사용자 버튼 생성 (PC/모바일 공통)
+     */
+    createUserButtons(container, isMobile = false) {
         // 기존 버튼들 제거
-        userButtonsContainer.innerHTML = '';
-        
+        container.innerHTML = '';
+
         // 각 사용자별 버튼 생성
         this.users.forEach(user => {
             const button = document.createElement('button');
             const isCurrentUser = user.name === this.currentUser;
-            
-            // 버튼 스타일링
+
+            // 버튼 스타일링 (PC와 모바일 동일)
             button.className = `w-full px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                isCurrentUser 
-                    ? 'bg-kakao-yellow text-kakao-brown border-2 border-kakao-brown shadow-md' 
+                isCurrentUser
+                    ? 'bg-kakao-yellow text-kakao-brown border-2 border-kakao-brown shadow-md'
                     : 'bg-gray-100 text-gray-700 border-2 border-gray-300 hover:bg-gray-200 hover:border-gray-400'
             }`;
-            
-            // 버튼 텍스트
-            const leftSpan = document.createElement('span');
-            leftSpan.textContent = user.name;
-            
-            const rightDiv = document.createElement('div');
-            rightDiv.className = 'text-xs';
-            rightDiv.textContent = `${user.messageCount}개 메시지${isCurrentUser ? ' 👤' : ''}`;
-            
-            const containerDiv = document.createElement('div');
-            containerDiv.className = 'flex items-center justify-between';
-            containerDiv.appendChild(leftSpan);
-            containerDiv.appendChild(rightDiv);
-            
-            button.appendChild(containerDiv);
-            
+
+            // 버튼 텍스트 및 아이콘 (향상된 디자인)
+            button.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="w-6 h-6 bg-gray-300 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
+                            <span class="text-xs font-bold text-gray-600">${user.name[0]}</span>
+                        </div>
+                        <span class="truncate font-medium">${this.escapeHtml(user.name)}</span>
+                    </div>
+                    <div class="flex items-center text-xs text-gray-500">
+                        <span class="mr-2">${user.messageCount}개</span>
+                        ${isCurrentUser ? '<span class="text-kakao-brown font-bold">👤 나</span>' : ''}
+                    </div>
+                </div>
+            `;
+
             // 클릭 이벤트
             button.addEventListener('click', async () => {
                 console.log(`버튼 클릭: ${user.name}, 현재 사용자: ${this.currentUser}`);
                 if (this.currentUser !== user.name) {
                     console.log(`사용자 변경: ${this.currentUser} → ${user.name}`);
-                    
+
                     // 로딩 시작
                     this.showUserSwitchingLoading(true);
                     this.disableUserButtons(true);
-                    
+
                     // 사용자 변경
                     this.currentUser = user.name;
-                    
+
                     // 약간의 지연 후 렌더링 (자연스러운 로딩 경험)
                     setTimeout(() => {
                         this.render(this.chatData, false); // 재렌더링 시에는 isInitial = false
@@ -190,8 +205,8 @@ class ChatRenderer {
                     }, 100);
                 }
             });
-            
-            userButtonsContainer.appendChild(button);
+
+            container.appendChild(button);
         });
     }
     
@@ -223,11 +238,21 @@ class ChatRenderer {
      */
     showUserSwitchingLoading(show) {
         const loadingElement = document.getElementById('user-switching-loading');
+        const mobileLoadingElement = document.getElementById('mobile-user-switching-loading');
+
         if (loadingElement) {
             if (show) {
                 loadingElement.classList.remove('hidden');
             } else {
                 loadingElement.classList.add('hidden');
+            }
+        }
+
+        if (mobileLoadingElement) {
+            if (show) {
+                mobileLoadingElement.classList.remove('hidden');
+            } else {
+                mobileLoadingElement.classList.add('hidden');
             }
         }
     }
@@ -238,7 +263,9 @@ class ChatRenderer {
      */
     disableUserButtons(disable) {
         const userButtons = document.querySelectorAll('#user-buttons button');
-        userButtons.forEach(button => {
+        const mobileUserButtons = document.querySelectorAll('#mobile-user-buttons button');
+
+        [...userButtons, ...mobileUserButtons].forEach(button => {
             button.disabled = disable;
             if (disable) {
                 button.style.opacity = '0.6';
@@ -316,7 +343,7 @@ class ChatRenderer {
         const timeClass = isLastInGroup ? 'opacity-100' : 'opacity-0';
         
         return `
-            <div class="flex items-end max-w-[70%]">
+            <div class="flex items-end max-w-[70%] chat-message-container">
                 <div class="text-xs text-gray-500 mr-2 mb-1 ${timeClass} flex-shrink-0">
                     ${message.time}
                 </div>
@@ -324,7 +351,7 @@ class ChatRenderer {
                     <div class="bg-my-bubble text-black px-3 py-2 rounded-2xl break-words word-wrap overflow-wrap-anywhere">
                         ${content}
                     </div>
-                    
+
                 </div>
             </div>
         `;
@@ -343,7 +370,7 @@ class ChatRenderer {
         const profileClass = isFirstInGroup ? 'opacity-100' : 'opacity-0';
         
         return `
-            <div class="flex items-start max-w-[70%]">
+            <div class="flex items-start max-w-[70%] chat-message-container">
                 <div class="w-10 h-10 bg-gray-300 rounded-full mr-3 flex-shrink-0 flex items-center justify-center ${profileClass}">
                     <span class="text-gray-600 text-sm font-bold">${message.sender[0]}</span>
                 </div>
@@ -354,7 +381,7 @@ class ChatRenderer {
                             <div class="bg-other-bubble text-gray-800 px-3 py-2 rounded-2xl break-words word-wrap overflow-wrap-anywhere border">
                                 ${content}
                             </div>
-                            
+
                         </div>
                         <div class="text-xs text-gray-500 ml-2 mb-1 ${timeClass} flex-shrink-0">
                             ${message.time}

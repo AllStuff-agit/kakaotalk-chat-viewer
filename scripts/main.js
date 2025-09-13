@@ -8,7 +8,8 @@ class KakaoTalkViewer {
         this.parser = new KakaoTalkParser();
         this.renderer = new ChatRenderer('chat-messages');
         this.currentChatData = null;
-        
+        this.isProcessingFile = false; // 파일 처리 중복 방지 플래그
+
         this.initEventListeners();
     }
     
@@ -58,6 +59,9 @@ class KakaoTalkViewer {
 
         // 모바일/태블릿용 파일 업로드 기능
         this.initMobileFileUpload();
+
+        // 모바일 메뉴 시스템
+        this.initMobileMenu();
     }
     
     /**
@@ -104,6 +108,8 @@ class KakaoTalkViewer {
         const file = e.target.files[0];
         if (file) {
             this.processFile(file);
+            // 파일 입력 필드 초기화 (같은 파일을 다시 선택할 수 있도록)
+            e.target.value = '';
         }
     }
     
@@ -112,11 +118,19 @@ class KakaoTalkViewer {
      * @param {File} file - 선택된 파일
      */
     async processFile(file) {
-        // 파일 검증
-        if (!this.validateFile(file)) {
+        // 중복 처리 방지
+        if (this.isProcessingFile) {
             return;
         }
-        
+
+        // 파일 검증
+        if (!this.validateFile(file)) {
+            this.isProcessingFile = false;
+            return;
+        }
+
+        this.isProcessingFile = true;
+
         try {
             this.showLoading(true);
             this.hideError();
@@ -130,6 +144,7 @@ class KakaoTalkViewer {
             // 유효성 검증
             if (!this.validateChatData(this.currentChatData)) {
                 this.showError('올바른 카카오톡 채팅 내보내기 파일이 아닙니다.');
+                this.isProcessingFile = false;
                 return;
             }
             
@@ -144,6 +159,7 @@ class KakaoTalkViewer {
             this.showError('파일을 처리하는 중 오류가 발생했습니다: ' + error.message);
         } finally {
             this.showLoading(false);
+            this.isProcessingFile = false; // 플래그 초기화
         }
     }
     
@@ -203,14 +219,21 @@ class KakaoTalkViewer {
      */
     updateChatInfo(chatData) {
         const stats = this.parser.getStats();
-        
+
+        // PC용 채팅방 정보 업데이트
         document.getElementById('chat-title').textContent = chatData.title;
         document.getElementById('save-date').textContent = chatData.saveDate;
         document.getElementById('message-count').textContent = stats.totalMessages.toLocaleString();
-        
+
+        // 모바일용 채팅방 정보 업데이트
+        document.getElementById('mobile-chat-title').textContent = chatData.title;
+        document.getElementById('mobile-save-date').textContent = chatData.saveDate;
+        document.getElementById('mobile-message-count').textContent = stats.totalMessages.toLocaleString();
+
         // 채팅방 헤더는 renderer에서 업데이트됨
-        
+
         document.getElementById('chat-info').classList.remove('hidden');
+        document.getElementById('mobile-chat-info').classList.remove('hidden');
     }
     
     /**
@@ -235,13 +258,16 @@ class KakaoTalkViewer {
     showLoading(show) {
         const loading = document.getElementById('loading');
         const mobileLoading = document.getElementById('mobile-loading');
+        const mobileInfoLoading = document.getElementById('mobile-info-loading');
 
         if (show) {
             if (loading) loading.classList.remove('hidden');
             if (mobileLoading) mobileLoading.classList.remove('hidden');
+            if (mobileInfoLoading) mobileInfoLoading.classList.remove('hidden');
         } else {
             if (loading) loading.classList.add('hidden');
             if (mobileLoading) mobileLoading.classList.add('hidden');
+            if (mobileInfoLoading) mobileInfoLoading.classList.add('hidden');
         }
     }
     
@@ -252,6 +278,7 @@ class KakaoTalkViewer {
     showError(message) {
         const errorDiv = document.getElementById('error-message');
         const mobileErrorDiv = document.getElementById('mobile-error-message');
+        const mobileInfoErrorDiv = document.getElementById('mobile-info-error-message');
 
         if (errorDiv) {
             errorDiv.textContent = message;
@@ -261,6 +288,10 @@ class KakaoTalkViewer {
             mobileErrorDiv.textContent = message;
             mobileErrorDiv.classList.remove('hidden');
         }
+        if (mobileInfoErrorDiv) {
+            mobileInfoErrorDiv.textContent = message;
+            mobileInfoErrorDiv.classList.remove('hidden');
+        }
     }
     
     /**
@@ -269,9 +300,11 @@ class KakaoTalkViewer {
     hideError() {
         const errorDiv = document.getElementById('error-message');
         const mobileErrorDiv = document.getElementById('mobile-error-message');
+        const mobileInfoErrorDiv = document.getElementById('mobile-info-error-message');
 
         if (errorDiv) errorDiv.classList.add('hidden');
         if (mobileErrorDiv) mobileErrorDiv.classList.add('hidden');
+        if (mobileInfoErrorDiv) mobileInfoErrorDiv.classList.add('hidden');
     }
     
     /**
@@ -1005,26 +1038,12 @@ window.scrollToMessage = function(messageIndex) {
 
 // KakaoTalkViewer 클래스의 확장 메서드들
 KakaoTalkViewer.prototype.initMobileSearch = function() {
-        const mobileSearchBtn = document.getElementById('mobile-search-btn');
         const mobileSearchPanel = document.getElementById('mobile-search-panel');
         const mobileSearchClose = document.getElementById('mobile-search-close');
         const mobileSearchInput = document.getElementById('mobile-search-input');
         const mobileSearchSubmit = document.getElementById('mobile-integrated-search');
         const mobileCalendarBtn = document.getElementById('mobile-date-filter-btn');
         const mobileCalendarPopup = document.getElementById('mobile-calendar-popup');
-        
-        // 검색 패널 열기
-        if (mobileSearchBtn && mobileSearchPanel) {
-            mobileSearchBtn.addEventListener('click', () => {
-                mobileSearchPanel.classList.remove('hidden');
-                // 패널이 표시된 후 포커스 설정
-                setTimeout(() => {
-                    if (mobileSearchInput) {
-                        mobileSearchInput.focus();
-                    }
-                }, 100);
-            });
-        }
         
         // 검색 패널 닫기
         if (mobileSearchClose && mobileSearchPanel) {
@@ -1065,6 +1084,7 @@ KakaoTalkViewer.prototype.initMobileSearch = function() {
                 e.stopPropagation();
                 mobileCalendarPopup.classList.toggle('hidden');
                 if (!mobileCalendarPopup.classList.contains('hidden')) {
+                    this.initMobileCalendarDate();
                     this.renderMobileCalendar();
                 }
             });
@@ -1078,6 +1098,30 @@ KakaoTalkViewer.prototype.initMobileSearch = function() {
                 }
             }
         });
+
+        // 모바일 달력 월 이동 버튼
+        const mobilePrevMonth = document.getElementById('mobile-prev-month');
+        const mobileNextMonth = document.getElementById('mobile-next-month');
+        const mobileCloseCalendar = document.getElementById('mobile-close-calendar');
+
+        if (mobilePrevMonth) {
+            mobilePrevMonth.addEventListener('click', () => this.changeMobileMonth(-1));
+        }
+        if (mobileNextMonth) {
+            mobileNextMonth.addEventListener('click', () => this.changeMobileMonth(1));
+        }
+
+        // 모바일 달력 닫기 버튼
+        if (mobileCloseCalendar) {
+            mobileCloseCalendar.addEventListener('click', () => {
+                if (mobileCalendarPopup) {
+                    mobileCalendarPopup.classList.add('hidden');
+                }
+            });
+        }
+
+        // 모바일 달력 현재 날짜 초기화
+        this.currentMobileCalendarDate = new Date();
 };
 
 /**
@@ -1225,66 +1269,100 @@ KakaoTalkViewer.prototype.scrollToMobileSearchResult = function(messageIndex) {
  * 모바일 달력 렌더링
  */
 KakaoTalkViewer.prototype.renderMobileCalendar = function() {
-        const mobileCalendarContainer = document.getElementById('mobile-calendar-container');
-        if (!mobileCalendarContainer || !this.currentChatData) return;
-        
-        // 채팅 데이터에서 날짜 추출
-        const availableDates = new Set();
-        this.currentChatData.messages.forEach(message => {
-            if (message.type === 'date' && message.date) {
-                // "2025년 5월 20일 화요일" 형태에서 "2025-05-20" 형태로 변환
-                const dateMatch = message.date.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
-                if (dateMatch) {
-                    const [, year, month, day] = dateMatch;
-                    const dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                    availableDates.add(dateString);
-                }
-            }
+    if (!this.currentChatData) return;
+
+    const monthYearElement = document.getElementById('mobile-calendar-month-year');
+    const calendarDays = document.getElementById('mobile-calendar-days');
+
+    if (!monthYearElement || !calendarDays) return;
+
+    const year = this.currentMobileCalendarDate.getFullYear();
+    const month = this.currentMobileCalendarDate.getMonth();
+
+    // 월/년도 표시
+    monthYearElement.textContent = `${year}년 ${month + 1}월`;
+
+    // 달력 그리드 생성
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+    calendarDays.innerHTML = '';
+
+    for (let i = 0; i < 42; i++) { // 6주 * 7일
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+
+        const dayElement = this.createMobileDayElement(currentDate, month);
+        calendarDays.appendChild(dayElement);
+    }
+};
+
+/**
+ * 모바일 달력 날짜 요소 생성 (PC와 동일한 로직)
+ */
+KakaoTalkViewer.prototype.createMobileDayElement = function(date, currentMonth) {
+    const dayElement = document.createElement('div');
+    const day = date.getDate();
+    const isCurrentMonth = date.getMonth() === currentMonth;
+    const dateString = this.formatDateForComparison(date);
+    const hasData = this.availableDates && this.availableDates.has(dateString);
+
+    dayElement.textContent = day;
+    dayElement.className = 'text-center py-2 text-sm cursor-pointer rounded';
+
+    if (!isCurrentMonth) {
+        // 다른 달의 날짜
+        dayElement.className += ' text-gray-300';
+    } else if (hasData) {
+        // 채팅 데이터가 있는 날짜 (PC와 동일한 스타일)
+        dayElement.className += ' text-black font-bold hover:bg-gray-100';
+        dayElement.addEventListener('click', () => {
+            this.scrollToMobileDateFromCalendar(dateString);
         });
-        
-        // 달력 HTML 생성
-        const calendarHtml = Array.from(availableDates)
-            .sort()
-            .map(dateString => {
-                const date = new Date(dateString);
-                const options = { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric',
-                    weekday: 'long'
-                };
-                const displayDate = date.toLocaleDateString('ko-KR', options);
-                
-                return `
-                    <div class="p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors mobile-date-item"
-                         data-date="${dateString}">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span class="text-sm font-medium text-blue-600">${date.getDate()}</span>
-                            </div>
-                            <div>
-                                <div class="font-medium text-gray-900">${displayDate}</div>
-                                <div class="text-sm text-gray-500">해당 날짜로 이동</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        
-        mobileCalendarContainer.innerHTML = calendarHtml;
-        
-        // 날짜 클릭 이벤트 추가
-        mobileCalendarContainer.querySelectorAll('.mobile-date-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const dateString = item.dataset.date;
-                this.jumpToMobileDate(dateString);
-                // 달력 팝업 닫기
-                const mobileCalendarPopup = document.getElementById('mobile-calendar-popup');
-                if (mobileCalendarPopup) {
-                    mobileCalendarPopup.classList.add('hidden');
-                }
-            });
-        });
+    } else {
+        // 채팅 데이터가 없는 날짜
+        dayElement.className += ' text-gray-400';
+    }
+
+    return dayElement;
+};
+
+/**
+ * 모바일 달력에서 날짜 클릭 시 해당 날짜로 스크롤 (PC와 동일한 로직)
+ */
+KakaoTalkViewer.prototype.scrollToMobileDateFromCalendar = function(dateString) {
+    // 달력 팝업 닫기
+    const mobileCalendarPopup = document.getElementById('mobile-calendar-popup');
+    if (mobileCalendarPopup) {
+        mobileCalendarPopup.classList.add('hidden');
+    }
+
+    // 검색 패널도 닫기
+    const mobileSearchPanel = document.getElementById('mobile-search-panel');
+    if (mobileSearchPanel) {
+        mobileSearchPanel.classList.add('hidden');
+    }
+
+    // 해당 날짜로 스크롤 (PC와 동일한 로직 사용)
+    this.scrollToDate(dateString);
+};
+
+/**
+ * 모바일 달력 월 변경
+ */
+KakaoTalkViewer.prototype.changeMobileMonth = function(direction) {
+    this.currentMobileCalendarDate.setMonth(this.currentMobileCalendarDate.getMonth() + direction);
+    this.renderMobileCalendar();
+};
+
+/**
+ * 모바일 달력 초기 날짜 설정 (PC와 동일하게 오늘 날짜로 초기화)
+ */
+KakaoTalkViewer.prototype.initMobileCalendarDate = function() {
+    // PC와 동일하게 오늘 날짜로 초기화
+    this.currentMobileCalendarDate = new Date();
 };
 
 /**
@@ -1360,6 +1438,42 @@ KakaoTalkViewer.prototype.initMobileFileUpload = function() {
             if (mobileFileInput) mobileFileInput.click();
         });
     }
+
+    // 모바일 정보 패널 파일 업로드 기능
+    this.initMobileInfoFileUpload();
+};
+
+/**
+ * 모바일 정보 패널 파일 업로드 기능 초기화
+ */
+KakaoTalkViewer.prototype.initMobileInfoFileUpload = function() {
+    const mobileInfoFileInput = document.getElementById('mobile-info-file-input');
+    const mobileInfoUploadBtn = document.getElementById('mobile-info-upload-btn');
+    const mobileInfoUploadArea = document.getElementById('mobile-info-upload-area');
+
+    // 모바일 정보 패널 파일 선택 버튼
+    if (mobileInfoUploadBtn && mobileInfoFileInput) {
+        mobileInfoUploadBtn.addEventListener('click', () => {
+            mobileInfoFileInput.click();
+        });
+    }
+
+    // 모바일 정보 패널 파일 입력 변경
+    if (mobileInfoFileInput) {
+        mobileInfoFileInput.addEventListener('change', (e) => {
+            this.handleFileSelect(e);
+        });
+    }
+
+    // 모바일 정보 패널 드래그 앤 드롭
+    if (mobileInfoUploadArea) {
+        mobileInfoUploadArea.addEventListener('dragover', (e) => this.handleMobileDragOver(e));
+        mobileInfoUploadArea.addEventListener('dragleave', (e) => this.handleMobileDragLeave(e));
+        mobileInfoUploadArea.addEventListener('drop', (e) => this.handleMobileDrop(e));
+        mobileInfoUploadArea.addEventListener('click', () => {
+            if (mobileInfoFileInput) mobileInfoFileInput.click();
+        });
+    }
 };
 
 /**
@@ -1396,6 +1510,74 @@ KakaoTalkViewer.prototype.handleMobileDrop = function(e) {
     if (files.length > 0) {
         this.processFile(files[0]);
     }
+};
+
+/**
+ * 모바일 메뉴 시스템 초기화
+ */
+KakaoTalkViewer.prototype.initMobileMenu = function() {
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileMenuDropdown = document.getElementById('mobile-menu-dropdown');
+    const mobileInfoMenu = document.getElementById('mobile-info-menu');
+    const mobileSearchMenu = document.getElementById('mobile-search-menu');
+    const mobileInfoPanel = document.getElementById('mobile-info-panel');
+    const mobileInfoClose = document.getElementById('mobile-info-close');
+    const mobileSearchPanel = document.getElementById('mobile-search-panel');
+
+    // 모바일 메뉴 버튼 클릭
+    if (mobileMenuBtn && mobileMenuDropdown) {
+        mobileMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            mobileMenuDropdown.classList.toggle('hidden');
+        });
+    }
+
+    // 채팅방 정보 메뉴 클릭
+    if (mobileInfoMenu && mobileInfoPanel) {
+        mobileInfoMenu.addEventListener('click', () => {
+            mobileMenuDropdown.classList.add('hidden');
+            mobileInfoPanel.classList.remove('hidden');
+            // 검색 패널이 열려있다면 닫기
+            if (mobileSearchPanel) {
+                mobileSearchPanel.classList.add('hidden');
+            }
+        });
+    }
+
+    // 검색 메뉴 클릭 (기존 검색 패널 열기)
+    if (mobileSearchMenu && mobileSearchPanel) {
+        mobileSearchMenu.addEventListener('click', () => {
+            mobileMenuDropdown.classList.add('hidden');
+            mobileSearchPanel.classList.remove('hidden');
+            // 정보 패널이 열려있다면 닫기
+            if (mobileInfoPanel) {
+                mobileInfoPanel.classList.add('hidden');
+            }
+            // 검색 입력 필드에 포커스
+            setTimeout(() => {
+                const searchInput = document.getElementById('mobile-search-input');
+                if (searchInput) {
+                    searchInput.focus();
+                }
+            }, 100);
+        });
+    }
+
+    // 모바일 정보 패널 닫기
+    if (mobileInfoClose && mobileInfoPanel) {
+        mobileInfoClose.addEventListener('click', () => {
+            mobileInfoPanel.classList.add('hidden');
+        });
+    }
+
+    // 외부 클릭 시 메뉴 드롭다운 닫기
+    document.addEventListener('click', (e) => {
+        if (mobileMenuDropdown && !mobileMenuDropdown.classList.contains('hidden')) {
+            if (!mobileMenuDropdown.contains(e.target) && e.target !== mobileMenuBtn) {
+                mobileMenuDropdown.classList.add('hidden');
+            }
+        }
+    });
 };
 
 // 애플리케이션 초기화
