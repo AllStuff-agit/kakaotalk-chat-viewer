@@ -102,8 +102,8 @@
 <body class="bg-gray-100 font-kakao">
     <div class="flex justify-center bg-gray-100 min-h-screen w-full">
         
-        <!-- 왼쪽 사이드바 -->
-        <div class="w-80 min-w-80 max-w-80 bg-white shadow-lg flex flex-col flex-shrink-0 h-screen">
+        <!-- 왼쪽 사이드바 (PC에서만 표시) -->
+        <div class="hidden lg:flex w-80 min-w-80 max-w-80 bg-white shadow-lg flex-col flex-shrink-0 h-screen">
                 <!-- 헤더 -->
                 <header class="p-6 border-b border-gray-200">
                     <h1 class="text-xl font-bold text-kakao-brown mb-2">✨​ KakaoTalk Chat Viewer</h1>
@@ -172,8 +172,8 @@
             <div id="error-message" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded m-6 text-sm"></div>
         </div>
 
-        <!-- 메인 채팅 영역 (화면 중앙) -->
-        <div class="hidden sm:flex sm:w-[600px] flex-shrink-0 flex-col h-screen">
+        <!-- 메인 채팅 영역 (모바일: 전체, 태블릿 이상: 중앙) -->
+        <div class="flex w-full lg:w-[600px] flex-shrink-0 flex-col h-screen">
             <!-- 채팅방 컨테이너 -->
             <div id="chat-container" class="hidden flex flex-col h-full bg-white relative">
                 <!-- 채팅방 헤더 -->
@@ -193,7 +193,8 @@
                         <!-- 오른쪽: 아이콘들 -->
                         <div class="flex items-center space-x-2">
                             <!-- 폰트 크기 조절 -->
-                            <div class="flex items-center space-x-1 bg-gray-100 rounded-lg px-2 py-1">
+                            <!-- 폰트 크기 조절 (PC에서만 표시) -->
+                            <div class="hidden lg:flex items-center space-x-1 bg-gray-100 rounded-lg px-2 py-1">
                                 <button id="font-size-decrease" class="w-6 h-6 text-gray-600 hover:text-gray-800 hover:bg-gray-200 active:bg-gray-300 active:scale-95 transition-all duration-150 flex items-center justify-center rounded">
                                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
@@ -216,6 +217,18 @@
                                     </svg>
                                 </button>
                             </div>
+                            
+                            <!-- 모바일 검색 버튼 (모바일에서만 표시) -->
+                            <button id="mobile-search-btn" class="lg:hidden w-8 h-8 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors flex items-center justify-center relative group">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                                <!-- 툴팁 -->
+                                <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                    검색
+                                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                                </div>
+                            </button>
                             
                             <!-- 메뉴 아이콘 -->
                             <button class="w-6 h-6 text-gray-600 hover:text-gray-800 transition-colors" title="메뉴">
@@ -299,13 +312,111 @@
                 <div class="text-center text-gray-500">
                     <div class="text-6xl mb-4">💞</div>
                     <h2 class="text-2xl font-semibold mb-2 text-gray-700">카카오톡 채팅방 뷰어</h2>
-                    <p class="text-gray-500">왼쪽 사이드바에서 채팅 파일을 업로드해주세요</p>
+                    <p class="text-gray-500">
+                        <span class="hidden lg:inline">왼쪽 사이드바에서 채팅 파일을 업로드해주세요</span>
+                        <span class="lg:hidden">메뉴 버튼을 눌러 채팅 파일을 업로드해주세요</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- 모바일 검색 패널 (모바일에서만 표시) -->
+            <div id="mobile-search-panel" class="hidden lg:hidden fixed inset-0 bg-white z-50 flex flex-col">
+                <!-- 모바일 검색 헤더 -->
+                <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800">대화내용 검색</h2>
+                    <button id="mobile-search-close" class="w-8 h-8 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors flex items-center justify-center">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- 모바일 검색 입력 -->
+                <div class="p-4 border-b border-gray-200">
+                    <div class="flex space-x-2">
+                        <div class="flex-1 relative">
+                            <input 
+                                type="text" 
+                                id="mobile-search-input" 
+                                placeholder="대화 내용을 검색하세요..." 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-kakao-yellow focus:border-transparent"
+                            >
+                            <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <button id="mobile-date-filter-btn" class="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300">
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <!-- 모바일 검색 버튼 -->
+                    <button id="mobile-integrated-search" class="mt-3 w-full bg-kakao-yellow text-kakao-brown py-3 px-4 rounded-lg hover:bg-yellow-400 transition-colors text-sm font-medium">
+                        검색
+                    </button>
+                </div>
+                
+                <!-- 모바일 검색 결과 -->
+                <div class="flex-1 overflow-y-auto">
+                    <!-- 로딩 -->
+                    <div id="mobile-search-loading" class="hidden p-4 text-center">
+                        <div class="flex justify-center">
+                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-kakao-yellow"></div>
+                        </div>
+                        <span class="text-gray-600 text-sm">검색 중...</span>
+                    </div>
+                    
+                    <!-- 검색 결과 -->
+                    <div id="mobile-search-results" class="p-4">
+                        <div class="text-center text-gray-500 text-sm py-8">
+                            검색어를 입력해주세요
+                        </div>
+                    </div>
+                    
+                    <!-- 달력 팝업 -->
+                    <div id="mobile-calendar-popup" class="hidden p-4">
+                        <div class="bg-white rounded-lg border border-gray-200 shadow-lg">
+                            <div class="flex justify-between items-center p-3 border-b border-gray-200">
+                                <button id="mobile-prev-month" class="p-1 text-gray-500 hover:text-gray-700">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                </button>
+                                <h3 id="mobile-calendar-month-year" class="text-lg font-semibold text-gray-800"></h3>
+                                <button id="mobile-next-month" class="p-1 text-gray-500 hover:text-gray-700">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="mobile-calendar-grid" class="p-3">
+                                <!-- 요일 헤더 -->
+                                <div class="grid grid-cols-7 gap-1 mb-2">
+                                    <div class="text-center text-xs font-medium text-gray-500 py-2">일</div>
+                                    <div class="text-center text-xs font-medium text-gray-500 py-2">월</div>
+                                    <div class="text-center text-xs font-medium text-gray-500 py-2">화</div>
+                                    <div class="text-center text-xs font-medium text-gray-500 py-2">수</div>
+                                    <div class="text-center text-xs font-medium text-gray-500 py-2">목</div>
+                                    <div class="text-center text-xs font-medium text-gray-500 py-2">금</div>
+                                    <div class="text-center text-xs font-medium text-gray-500 py-2">토</div>
+                                </div>
+                                <!-- 날짜 그리드 -->
+                                <div id="mobile-calendar-days" class="grid grid-cols-7 gap-1">
+                                    <!-- 날짜들이 동적으로 추가됩니다 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <!-- 오른쪽 검색 사이드바 -->
-        <div id="search-sidebar" class="w-80 min-w-80 max-w-80 bg-white border-l border-gray-200 shadow-lg flex flex-col h-screen">
+        <!-- 오른쪽 검색 사이드바 (PC에서만 표시) -->
+        <div id="search-sidebar" class="hidden lg:flex w-80 min-w-80 max-w-80 bg-white border-l border-gray-200 shadow-lg flex-col h-screen">
             <!-- 검색 패널 -->
             <div class="flex flex-col h-full">
                 <!-- 검색 헤더 -->

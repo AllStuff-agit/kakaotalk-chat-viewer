@@ -42,6 +42,9 @@ class KakaoTalkViewer {
         // 폰트 크기 조절 기능
         this.initFontSizeControls();
         this.currentFontSize = 14; // 기본 폰트 크기
+        
+        // 모바일 검색 기능
+        this.initMobileSearch();
     }
     
     /**
@@ -921,6 +924,330 @@ window.scrollToMessage = function(messageIndex) {
                 });
             }
         }, 300); // 300ms 후에 하이라이트 적용
+    }
+    
+    /**
+     * 모바일 검색 기능 초기화
+     */
+    initMobileSearch() {
+        const mobileSearchBtn = document.getElementById('mobile-search-btn');
+        const mobileSearchPanel = document.getElementById('mobile-search-panel');
+        const mobileSearchClose = document.getElementById('mobile-search-close');
+        const mobileSearchInput = document.getElementById('mobile-search-input');
+        const mobileSearchSubmit = document.getElementById('mobile-search-submit');
+        const mobileCalendarBtn = document.getElementById('mobile-calendar-btn');
+        const mobileCalendarPopup = document.getElementById('mobile-calendar-popup');
+        const mobileCalendarClose = document.getElementById('mobile-calendar-close');
+        
+        // 검색 패널 열기
+        if (mobileSearchBtn && mobileSearchPanel) {
+            mobileSearchBtn.addEventListener('click', () => {
+                mobileSearchPanel.classList.remove('hidden');
+                // 패널이 표시된 후 포커스 설정
+                setTimeout(() => {
+                    if (mobileSearchInput) {
+                        mobileSearchInput.focus();
+                    }
+                }, 100);
+            });
+        }
+        
+        // 검색 패널 닫기
+        if (mobileSearchClose && mobileSearchPanel) {
+            mobileSearchClose.addEventListener('click', () => {
+                mobileSearchPanel.classList.add('hidden');
+                // 검색 입력 필드 초기화
+                if (mobileSearchInput) {
+                    mobileSearchInput.value = '';
+                }
+                // 검색 결과 초기화
+                const mobileSearchResults = document.getElementById('mobile-search-results');
+                if (mobileSearchResults) {
+                    mobileSearchResults.innerHTML = '';
+                }
+            });
+        }
+        
+        // 모바일 검색 실행
+        if (mobileSearchSubmit && mobileSearchInput) {
+            const executeSearch = () => {
+                const searchTerm = mobileSearchInput.value.trim();
+                if (searchTerm) {
+                    this.performMobileSearch(searchTerm);
+                }
+            };
+            
+            mobileSearchSubmit.addEventListener('click', executeSearch);
+            mobileSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    executeSearch();
+                }
+            });
+        }
+        
+        // 모바일 달력 열기
+        if (mobileCalendarBtn && mobileCalendarPopup) {
+            mobileCalendarBtn.addEventListener('click', () => {
+                mobileCalendarPopup.classList.remove('hidden');
+                this.createMobileCalendar();
+            });
+        }
+        
+        // 모바일 달력 닫기
+        if (mobileCalendarClose && mobileCalendarPopup) {
+            mobileCalendarClose.addEventListener('click', () => {
+                mobileCalendarPopup.classList.add('hidden');
+            });
+        }
+    }
+    
+    /**
+     * 모바일 검색 실행
+     */
+    performMobileSearch(searchTerm) {
+        if (!this.currentChatData) return;
+        
+        const results = [];
+        const messages = this.currentChatData.messages.filter(msg => msg.type === 'message');
+        
+        messages.forEach((message, index) => {
+            if (message.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                message.sender.toLowerCase().includes(searchTerm.toLowerCase())) {
+                results.push({
+                    ...message,
+                    index: index
+                });
+            }
+        });
+        
+        this.displayMobileSearchResults(results, searchTerm);
+    }
+    
+    /**
+     * 모바일 검색 결과 표시
+     */
+    displayMobileSearchResults(results, searchTerm) {
+        const resultsContainer = document.getElementById('mobile-search-results');
+        if (!resultsContainer) return;
+        
+        if (results.length === 0) {
+            resultsContainer.innerHTML = `
+                <div class="p-4 text-center text-gray-500">
+                    <div class="text-lg mb-2">😔</div>
+                    <div>검색 결과가 없습니다</div>
+                    <div class="text-sm mt-1">"${searchTerm}"에 대한 결과가 없어요</div>
+                </div>
+            `;
+            return;
+        }
+        
+        const resultHtml = results.map(result => {
+            // 검색어 하이라이트 처리
+            const highlightedContent = result.content.replace(
+                new RegExp(`(${searchTerm})`, 'gi'),
+                '<mark class="bg-yellow-200 px-1 rounded">$1</mark>'
+            );
+            
+            const highlightedSender = result.sender.replace(
+                new RegExp(`(${searchTerm})`, 'gi'),
+                '<mark class="bg-yellow-200 px-1 rounded">$1</mark>'
+            );
+            
+            return `
+                <div class="p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors search-result-item"
+                     data-message-index="${result.index}">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0 flex items-center justify-center">
+                            <span class="text-xs text-gray-600">${result.sender.charAt(0)}</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span class="font-medium text-sm text-gray-900">${highlightedSender}</span>
+                                <span class="text-xs text-gray-500">${result.time}</span>
+                            </div>
+                            <div class="text-sm text-gray-700 break-words">${highlightedContent}</div>
+                            <div class="text-xs text-gray-400 mt-1">${result.date}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        resultsContainer.innerHTML = `
+            <div class="p-3 bg-gray-50 border-b border-gray-200">
+                <div class="text-sm text-gray-600">
+                    총 <strong>${results.length}개</strong>의 결과를 찾았습니다
+                </div>
+            </div>
+            ${resultHtml}
+        `;
+        
+        // 검색 결과 클릭 이벤트 추가
+        resultsContainer.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const messageIndex = parseInt(item.dataset.messageIndex);
+                this.scrollToMobileSearchResult(messageIndex);
+                // 검색 패널 닫기
+                const mobileSearchPanel = document.getElementById('mobile-search-panel');
+                if (mobileSearchPanel) {
+                    mobileSearchPanel.classList.add('hidden');
+                }
+            });
+        });
+    }
+    
+    /**
+     * 모바일 검색 결과로 스크롤
+     */
+    scrollToMobileSearchResult(messageIndex) {
+        if (!this.currentChatData) return;
+        
+        const chatMessages = document.getElementById('chat-messages');
+        const messageElements = chatMessages.children;
+        
+        // 실제 메시지 인덱스 찾기 (날짜 구분선 포함)
+        let actualIndex = 0;
+        let messageCount = 0;
+        
+        for (let i = 0; i < this.currentChatData.messages.length; i++) {
+            if (this.currentChatData.messages[i].type === 'message') {
+                if (messageCount === messageIndex) {
+                    actualIndex = i;
+                    break;
+                }
+                messageCount++;
+            }
+        }
+        
+        if (actualIndex < messageElements.length) {
+            messageElements[actualIndex].scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
+            });
+            
+            // 하이라이트 효과
+            setTimeout(() => {
+                const previousHighlight = chatMessages.querySelector('.search-highlight');
+                if (previousHighlight) {
+                    previousHighlight.classList.remove('search-highlight');
+                }
+                
+                messageElements[actualIndex].classList.add('search-highlight');
+                
+                // 하이라이트 자동 제거
+                setTimeout(() => {
+                    messageElements[actualIndex].classList.remove('search-highlight');
+                }, 3000);
+            }, 300);
+        }
+    }
+    
+    /**
+     * 모바일 달력 생성
+     */
+    createMobileCalendar() {
+        const mobileCalendarContainer = document.getElementById('mobile-calendar-container');
+        if (!mobileCalendarContainer || !this.currentChatData) return;
+        
+        // 채팅 데이터에서 날짜 추출
+        const availableDates = new Set();
+        this.currentChatData.messages.forEach(message => {
+            if (message.type === 'date' && message.date) {
+                // "2025년 5월 20일 화요일" 형태에서 "2025-05-20" 형태로 변환
+                const dateMatch = message.date.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+                if (dateMatch) {
+                    const [, year, month, day] = dateMatch;
+                    const dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                    availableDates.add(dateString);
+                }
+            }
+        });
+        
+        // 달력 HTML 생성
+        const calendarHtml = Array.from(availableDates)
+            .sort()
+            .map(dateString => {
+                const date = new Date(dateString);
+                const options = { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    weekday: 'long'
+                };
+                const displayDate = date.toLocaleDateString('ko-KR', options);
+                
+                return `
+                    <div class="p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors mobile-date-item"
+                         data-date="${dateString}">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span class="text-sm font-medium text-blue-600">${date.getDate()}</span>
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-900">${displayDate}</div>
+                                <div class="text-sm text-gray-500">해당 날짜로 이동</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        
+        mobileCalendarContainer.innerHTML = calendarHtml;
+        
+        // 날짜 클릭 이벤트 추가
+        mobileCalendarContainer.querySelectorAll('.mobile-date-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const dateString = item.dataset.date;
+                this.jumpToMobileDate(dateString);
+                // 달력 팝업 닫기
+                const mobileCalendarPopup = document.getElementById('mobile-calendar-popup');
+                if (mobileCalendarPopup) {
+                    mobileCalendarPopup.classList.add('hidden');
+                }
+            });
+        });
+    }
+    
+    /**
+     * 모바일에서 특정 날짜로 이동
+     */
+    jumpToMobileDate(dateString) {
+        if (!this.currentChatData) return;
+        
+        // "2025-05-20" 형태를 "2025년 5월 20일" 형태로 변환
+        const [year, month, day] = dateString.split('-');
+        const targetDate = `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
+        
+        for (let i = 0; i < this.currentChatData.messages.length; i++) {
+            const message = this.currentChatData.messages[i];
+            if (message.type === 'date' && message.date.includes(targetDate)) {
+                const chatMessages = document.getElementById('chat-messages');
+                const messageElements = chatMessages.children;
+                
+                if (i < messageElements.length) {
+                    messageElements[i].scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' 
+                    });
+                    
+                    // 하이라이트 효과
+                    setTimeout(() => {
+                        const previousHighlight = chatMessages.querySelector('.search-highlight');
+                        if (previousHighlight) {
+                            previousHighlight.classList.remove('search-highlight');
+                        }
+                        
+                        messageElements[i].classList.add('search-highlight');
+                        
+                        // 하이라이트 자동 제거
+                        setTimeout(() => {
+                            messageElements[i].classList.remove('search-highlight');
+                        }, 3000);
+                    }, 300);
+                }
+                break;
+            }
+        }
     }
 };
 
