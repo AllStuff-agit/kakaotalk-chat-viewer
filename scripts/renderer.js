@@ -343,7 +343,7 @@ class ChatRenderer {
         const timeClass = isLastInGroup ? 'opacity-100' : 'opacity-0';
         
         return `
-            <div class="flex items-end max-w-[70%] chat-message-container">
+            <div class="flex items-end max-w-[90%] chat-message-container">
                 <div class="text-xs text-gray-500 mr-2 mb-1 ${timeClass} flex-shrink-0">
                     ${message.time}
                 </div>
@@ -370,7 +370,7 @@ class ChatRenderer {
         const profileClass = isFirstInGroup ? 'opacity-100' : 'opacity-0';
         
         return `
-            <div class="flex items-start max-w-[70%] chat-message-container">
+            <div class="flex items-start max-w-[90%] chat-message-container">
                 <div class="w-10 h-10 bg-gray-300 rounded-full mr-3 flex-shrink-0 flex items-center justify-center ${profileClass}">
                     <span class="text-gray-600 text-sm font-bold">${message.sender[0]}</span>
                 </div>
