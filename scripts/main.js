@@ -10,7 +10,42 @@ class KakaoTalkViewer {
         this.currentChatData = null;
         this.isProcessingFile = false; // 파일 처리 중복 방지 플래그
 
+        // 데스크톱 전용 체크
+        if (!this.isDesktop()) {
+            this.showDesktopOnlyNotice();
+            return;
+        }
+
         this.initEventListeners();
+    }
+
+    /**
+     * 데스크톱 환경인지 체크
+     * @returns {boolean} 데스크톱이면 true
+     */
+    isDesktop() {
+        // 화면 크기 체크 (1024px 이상)
+        const isWideScreen = window.innerWidth >= 1024;
+
+        // 모바일/태블릿 User Agent 체크
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isMobileDevice = /mobile|tablet|android|ipad|iphone|ipod|blackberry|windows phone/i.test(userAgent);
+
+        // 데스크톱 조건: 넓은 화면 + 모바일 기기가 아님
+        return isWideScreen && !isMobileDevice;
+    }
+
+    /**
+     * 데스크톱 전용 안내 화면 표시
+     */
+    showDesktopOnlyNotice() {
+        const noticeElement = document.getElementById('desktop-only-notice');
+        const mainAppElement = document.getElementById('main-app');
+
+        if (noticeElement && mainAppElement) {
+            noticeElement.classList.remove('hidden');
+            mainAppElement.classList.add('hidden');
+        }
     }
     
     /**
