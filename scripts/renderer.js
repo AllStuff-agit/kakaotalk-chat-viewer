@@ -495,14 +495,15 @@ class ChatRenderer {
     }
     
     /**
-     * HTML 이스케이프
+     * HTML 이스케이프 및 줄바꿈 처리
      * @param {string} text - 이스케이프할 텍스트
-     * @returns {string} 이스케이프된 텍스트
+     * @returns {string} 이스케이프되고 줄바꿈이 <br>로 변환된 텍스트
      */
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
-        return div.innerHTML;
+        // 줄바꿈 문자를 <br> 태그로 변환
+        return div.innerHTML.replace(/\n/g, '<br>');
     }
     
     /**

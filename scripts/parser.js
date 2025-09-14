@@ -20,27 +20,51 @@ class KakaoTalkParser {
     parse(content) {
         const lines = content.split('\n');
         let currentDate = '';
-        
+        let currentMessage = null; // 현재 처리 중인 멀티라인 메시지
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
-            
-            // 빈 줄 건너뛰기
-            if (!line) continue;
-            
+
+            // 빈 줄 처리 - 현재 메시지가 있으면 빈 줄도 메시지에 포함
+            if (!line) {
+                if (currentMessage) {
+                    // 빈 줄을 현재 메시지에 추가 (줄바꿈으로)
+                    currentMessage.content += '\n';
+                    currentMessage.raw += '\n';
+                }
+                continue;
+            }
+
+            // 새로운 메시지 시작인지 확인 (메시지 패턴 체크)
+            const messagePattern = /^\[([^\]]+)\]\s*\[([^\]]+)\]\s*(.*)$/;
+            const messageMatch = line.match(messagePattern);
+
             // 채팅방 제목 추출
             if (line.includes('님과 카카오톡 대화')) {
+                if (currentMessage) {
+                    this.chatData.messages.push(currentMessage);
+                    currentMessage = null;
+                }
                 this.chatData.title = line.replace(' 님과 카카오톡 대화', '');
                 continue;
             }
-            
+
             // 저장 날짜 추출
             if (line.startsWith('저장한 날짜 :')) {
+                if (currentMessage) {
+                    this.chatData.messages.push(currentMessage);
+                    currentMessage = null;
+                }
                 this.chatData.saveDate = line.replace('저장한 날짜 : ', '');
                 continue;
             }
-            
+
             // 날짜 구분선 처리
             if (line.startsWith('---------------') && line.includes('년') && line.includes('월')) {
+                if (currentMessage) {
+                    this.chatData.messages.push(currentMessage);
+                    currentMessage = null;
+                }
                 currentDate = this.extractDate(line);
                 this.chatData.messages.push({
                     type: 'date',
@@ -49,14 +73,38 @@ class KakaoTalkParser {
                 });
                 continue;
             }
-            
-            // 메시지 파싱
-            const messageData = this.parseMessage(line, currentDate);
-            if (messageData) {
-                this.chatData.messages.push(messageData);
+
+            if (messageMatch) {
+                // 이전 메시지가 있으면 완료 처리
+                if (currentMessage) {
+                    this.chatData.messages.push(currentMessage);
+                }
+
+                // 새로운 메시지 시작
+                const [, sender, time, content] = messageMatch;
+                currentMessage = {
+                    type: 'message',
+                    sender: sender.trim(),
+                    time: time.trim(),
+                    content: content.trim(),
+                    date: currentDate,
+                    messageType: this.detectMessageType(content.trim()),
+                    raw: line
+                };
+            } else if (currentMessage) {
+                // 기존 메시지에 내용 추가 (멀티라인)
+                currentMessage.content += '\n' + line;
+                currentMessage.raw += '\n' + line;
+                // 메시지 타입 재감지 (전체 내용 기준)
+                currentMessage.messageType = this.detectMessageType(currentMessage.content);
             }
         }
-        
+
+        // 마지막 메시지 처리
+        if (currentMessage) {
+            this.chatData.messages.push(currentMessage);
+        }
+
         return this.chatData;
     }
     
@@ -75,33 +123,6 @@ class KakaoTalkParser {
         return line;
     }
     
-    /**
-     * 개별 메시지 파싱
-     * @param {string} line - 메시지 라인
-     * @param {string} currentDate - 현재 날짜
-     * @returns {Object|null} 파싱된 메시지 데이터
-     */
-    parseMessage(line, currentDate) {
-        // 메시지 형태: [발신자] [시간] 내용
-        const messagePattern = /^\[([^\]]+)\]\s*\[([^\]]+)\]\s*(.*)$/;
-        const match = line.match(messagePattern);
-        
-        if (!match) {
-            return null;
-        }
-        
-        const [, sender, time, content] = match;
-        
-        return {
-            type: 'message',
-            sender: sender.trim(),
-            time: time.trim(),
-            content: content.trim(),
-            date: currentDate,
-            messageType: this.detectMessageType(content.trim()),
-            raw: line
-        };
-    }
     
     /**
      * 메시지 타입 감지
