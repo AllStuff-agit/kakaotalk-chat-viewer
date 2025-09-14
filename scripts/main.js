@@ -262,16 +262,16 @@ class KakaoTalkViewer {
         document.getElementById('chat-title').textContent = chatData.title;
         document.getElementById('save-date').textContent = chatData.saveDate;
         document.getElementById('message-count').textContent = stats.totalMessages.toLocaleString();
-
-        // 모바일용 채팅방 정보 업데이트
-        document.getElementById('mobile-chat-title').textContent = chatData.title;
-        document.getElementById('mobile-save-date').textContent = chatData.saveDate;
-        document.getElementById('mobile-message-count').textContent = stats.totalMessages.toLocaleString();
-
-        // 채팅방 헤더는 renderer에서 업데이트됨
-
         document.getElementById('chat-info').classList.remove('hidden');
-        document.getElementById('mobile-chat-info').classList.remove('hidden');
+
+        // 모바일용 채팅방 정보 업데이트 (요소가 존재할 경우에만)
+        const mobileChatTitle = document.getElementById('mobile-chat-title');
+        if (mobileChatTitle) {
+            mobileChatTitle.textContent = chatData.title;
+            document.getElementById('mobile-save-date').textContent = chatData.saveDate;
+            document.getElementById('mobile-message-count').textContent = stats.totalMessages.toLocaleString();
+            document.getElementById('mobile-chat-info').classList.remove('hidden');
+        }
     }
     
     /**
