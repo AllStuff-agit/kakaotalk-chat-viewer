@@ -61,6 +61,15 @@
         .overflow-wrap-anywhere {
             overflow-wrap: anywhere;
         }
+
+        #chat-messages {
+            overflow-anchor: none;
+        }
+
+        #chat-messages > [data-message-index] {
+            content-visibility: auto;
+            contain-intrinsic-size: auto 64px;
+        }
         
         /* 스크롤 날짜 표시 애니메이션 */
         .scroll-date-show {
@@ -448,6 +457,7 @@
 
     <!-- JavaScript -->
     <script src="scripts/parser.js"></script>
+    <script src="scripts/chat-store.js"></script>
     <script src="scripts/renderer.js"></script>
     <script src="scripts/main.js"></script>
 </body>
