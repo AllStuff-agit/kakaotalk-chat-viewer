@@ -3,6 +3,129 @@
  * 카카오톡에서 내보낸 채팅 데이터를 파싱하여 구조화된 데이터로 변환
  */
 
+class KakaoTalkStreamParser {
+    constructor(onEntry = () => {}) {
+        this.onEntry = onEntry;
+        this.buffer = '';
+        this.currentDate = '';
+        this.currentMessage = null;
+        this.finished = false;
+        this.metadata = {
+            title: '',
+            saveDate: '',
+            totalEntries: 0,
+            totalMessages: 0
+        };
+    }
+
+    pushChunk(text) {
+        if (this.finished) {
+            throw new Error('이미 완료된 채팅 파일에는 데이터를 추가할 수 없습니다.');
+        }
+
+        const lines = (this.buffer + text).split('\n');
+        this.buffer = lines.pop();
+        lines.forEach(line => this.consumeLine(line));
+    }
+
+    finish() {
+        if (this.finished) return this.metadata;
+        if (this.buffer) this.consumeLine(this.buffer);
+        this.flushMessage();
+        this.buffer = '';
+        this.finished = true;
+        return this.metadata;
+    }
+
+    consumeLine(rawLine) {
+        const line = rawLine.trim();
+
+        if (!line) {
+            if (this.currentMessage) {
+                this.currentMessage.content += '\n';
+                this.currentMessage.raw += '\n';
+            }
+            return;
+        }
+
+        const messageMatch = line.match(/^\[([^\]]+)\]\s*\[([^\]]+)\]\s*(.*)$/);
+
+        if (line.includes('님과 카카오톡 대화')) {
+            this.flushMessage();
+            this.metadata.title = line.replace(' 님과 카카오톡 대화', '');
+            return;
+        }
+
+        if (line.startsWith('저장한 날짜 :')) {
+            this.flushMessage();
+            this.metadata.saveDate = line.replace(/^저장한 날짜\s*:\s*/, '');
+            return;
+        }
+
+        if (line.startsWith('---------------') && line.includes('년') && line.includes('월')) {
+            this.flushMessage();
+            this.currentDate = this.extractDate(line);
+            this.emit({ type: 'date', date: this.currentDate, raw: line });
+            return;
+        }
+
+        if (messageMatch) {
+            this.flushMessage();
+            const [, sender, time, content] = messageMatch;
+            const trimmedContent = content.trim();
+            this.currentMessage = {
+                type: 'message',
+                sender: sender.trim(),
+                time: time.trim(),
+                content: trimmedContent,
+                date: this.currentDate,
+                messageType: this.detectMessageType(trimmedContent),
+                raw: line
+            };
+            return;
+        }
+
+        if (this.currentMessage) {
+            this.currentMessage.content += '\n' + line;
+            this.currentMessage.raw += '\n' + line;
+            this.currentMessage.messageType = this.detectMessageType(this.currentMessage.content);
+        }
+    }
+
+    flushMessage() {
+        if (!this.currentMessage) return;
+        this.emit(this.currentMessage);
+        this.currentMessage = null;
+    }
+
+    emit(entry) {
+        entry.index = this.metadata.totalEntries;
+        this.metadata.totalEntries++;
+        if (entry.type === 'message') this.metadata.totalMessages++;
+        this.onEntry(entry);
+    }
+
+    extractDate(line) {
+        const dateMatch = line.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*(\S+)/);
+        if (!dateMatch) return line;
+        const [, year, month, day, dayOfWeek] = dateMatch;
+        return `${year}년 ${month}월 ${day}일 ${dayOfWeek}`;
+    }
+
+    detectMessageType(content) {
+        if (!content) return 'empty';
+        if (content === '사진' || content === '동영상' || content === '사진 여러 장') return 'media';
+        if (content === '이모티콘' || content.startsWith('이모티콘:')) return 'emoticon';
+        if (content.includes('http://') || content.includes('https://')) return 'link';
+        if (content.includes('파일:') || content.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|zip|rar)$/i)) return 'file';
+        if (content === '음성메시지' || content.includes('음성메시지')) return 'voice';
+        if (content.includes('님이 들어왔습니다') ||
+            content.includes('님이 나갔습니다') ||
+            content.includes('대화방을 개설했습니다')) return 'system';
+        return 'text';
+    }
+}
+
 class KakaoTalkParser {
     constructor() {
         this.chatData = {
@@ -18,93 +141,12 @@ class KakaoTalkParser {
      * @returns {Object} 파싱된 채팅 데이터
      */
     parse(content) {
-        const lines = content.split('\n');
-        let currentDate = '';
-        let currentMessage = null; // 현재 처리 중인 멀티라인 메시지
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-
-            // 빈 줄 처리 - 현재 메시지가 있으면 빈 줄도 메시지에 포함
-            if (!line) {
-                if (currentMessage) {
-                    // 빈 줄을 현재 메시지에 추가 (줄바꿈으로)
-                    currentMessage.content += '\n';
-                    currentMessage.raw += '\n';
-                }
-                continue;
-            }
-
-            // 새로운 메시지 시작인지 확인 (메시지 패턴 체크)
-            const messagePattern = /^\[([^\]]+)\]\s*\[([^\]]+)\]\s*(.*)$/;
-            const messageMatch = line.match(messagePattern);
-
-            // 채팅방 제목 추출
-            if (line.includes('님과 카카오톡 대화')) {
-                if (currentMessage) {
-                    this.chatData.messages.push(currentMessage);
-                    currentMessage = null;
-                }
-                this.chatData.title = line.replace(' 님과 카카오톡 대화', '');
-                continue;
-            }
-
-            // 저장 날짜 추출
-            if (line.startsWith('저장한 날짜 :')) {
-                if (currentMessage) {
-                    this.chatData.messages.push(currentMessage);
-                    currentMessage = null;
-                }
-                this.chatData.saveDate = line.replace('저장한 날짜 : ', '');
-                continue;
-            }
-
-            // 날짜 구분선 처리
-            if (line.startsWith('---------------') && line.includes('년') && line.includes('월')) {
-                if (currentMessage) {
-                    this.chatData.messages.push(currentMessage);
-                    currentMessage = null;
-                }
-                currentDate = this.extractDate(line);
-                this.chatData.messages.push({
-                    type: 'date',
-                    date: currentDate,
-                    raw: line
-                });
-                continue;
-            }
-
-            if (messageMatch) {
-                // 이전 메시지가 있으면 완료 처리
-                if (currentMessage) {
-                    this.chatData.messages.push(currentMessage);
-                }
-
-                // 새로운 메시지 시작
-                const [, sender, time, content] = messageMatch;
-                currentMessage = {
-                    type: 'message',
-                    sender: sender.trim(),
-                    time: time.trim(),
-                    content: content.trim(),
-                    date: currentDate,
-                    messageType: this.detectMessageType(content.trim()),
-                    raw: line
-                };
-            } else if (currentMessage) {
-                // 기존 메시지에 내용 추가 (멀티라인)
-                currentMessage.content += '\n' + line;
-                currentMessage.raw += '\n' + line;
-                // 메시지 타입 재감지 (전체 내용 기준)
-                currentMessage.messageType = this.detectMessageType(currentMessage.content);
-            }
-        }
-
-        // 마지막 메시지 처리
-        if (currentMessage) {
-            this.chatData.messages.push(currentMessage);
-        }
-
+        this.chatData = { title: '', saveDate: '', messages: [] };
+        const parser = new KakaoTalkStreamParser(entry => this.chatData.messages.push(entry));
+        parser.pushChunk(content);
+        const metadata = parser.finish();
+        this.chatData.title = metadata.title;
+        this.chatData.saveDate = metadata.saveDate;
         return this.chatData;
     }
     
@@ -203,4 +245,5 @@ class KakaoTalkParser {
 }
 
 // 전역으로 클래스 내보내기
-window.KakaoTalkParser = KakaoTalkParser;
+globalThis.KakaoTalkStreamParser = KakaoTalkStreamParser;
+globalThis.KakaoTalkParser = KakaoTalkParser;
