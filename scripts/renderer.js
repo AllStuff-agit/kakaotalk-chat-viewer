@@ -13,54 +13,133 @@ class ChatRenderer {
         this.users = []; // 사용자 목록
         this.dateElements = []; // 날짜 요소들 저장
         this.scrollTimeout = null; // 스크롤 타임아웃
-        
+        this.windowSize = 400;
+        this.windowBuffer = 100;
+        this.renderStart = 0;
+        this.renderEnd = 0;
+        this.totalEntries = 0;
+        this.virtualHeight = 0;
+        this.store = null;
+        this.renderGeneration = 0;
+        this.pendingStart = null;
+        this.virtualScrollFrame = null;
         
         this.setupScrollDateIndicator();
+        window.chatRenderer = this;
     }
 
     /**
      * 채팅 데이터 렌더링
      * @param {Object} chatData - 파싱된 채팅 데이터
      * @param {boolean} isInitial - 초기 렌더링인지 여부
+     * @param {number|null} focusIndex - 표시할 메시지 인덱스
      */
-    render(chatData, isInitial = true) {
+    async render(chatData, store, isInitial = true, focusIndex = null) {
         this.chatData = chatData;
-        this.container.innerHTML = '';
-        this.dateElements = []; // 날짜 요소 배열 초기화
-        
+        this.store = store;
+        this.totalEntries = chatData.totalEntries;
+        this.virtualHeight = Math.max(
+            this.container.clientHeight || 800,
+            Math.min(this.totalEntries * 64, 10_000_000)
+        );
+
         if (isInitial) {
             this.determineCurrentUser(chatData);
         }
         this.setupUserButtons(chatData);
-        
-        // 모든 메시지를 한번에 렌더링
-        chatData.messages.forEach((message, index) => {
+
+        const start = focusIndex === null
+            ? this.totalEntries - this.windowSize
+            : focusIndex - Math.floor(this.windowSize / 2);
+        await this.renderWindow(start);
+        this.finishRendering(isInitial, focusIndex === null);
+    }
+
+    async renderWindow(startIndex) {
+        const start = Math.max(0, Math.min(startIndex, this.totalEntries - this.windowSize));
+        if (this.pendingStart === start) return false;
+
+        const generation = ++this.renderGeneration;
+        this.pendingStart = start;
+        const end = Math.min(this.totalEntries, start + this.windowSize);
+        const fetchStart = Math.max(0, start - 1);
+        const fetchEnd = Math.min(this.totalEntries, end + 1);
+        const entries = await this.store.getRange(fetchStart, fetchEnd - fetchStart);
+        if (generation !== this.renderGeneration) return false;
+
+        this.pendingStart = null;
+        this.renderStart = start;
+        this.renderEnd = end;
+        this.container.innerHTML = '';
+        this.dateElements = [];
+        const entriesByIndex = new Map(entries.map(entry => [entry.index, entry]));
+
+        const topHeight = this.windowOffset(start);
+        this.topSpacer = this.createSpacer(topHeight);
+        this.container.appendChild(this.topSpacer);
+
+        for (let index = this.renderStart; index < this.renderEnd; index++) {
+            const message = entriesByIndex.get(index);
+            if (!message) continue;
             if (message.type === 'date') {
-                this.renderDateSeparator(message);
+                this.renderDateSeparator(message, index);
             } else if (message.type === 'message') {
-                this.renderMessage(message, index, chatData.messages);
+                this.renderMessage(message, index, entriesByIndex);
             }
-        });
-        
-        this.finishRendering(isInitial);
+        }
+
+        const estimatedWindowHeight = (this.renderEnd - this.renderStart) * 64;
+        this.bottomSpacer = this.createSpacer(this.virtualHeight - topHeight - estimatedWindowHeight);
+        this.container.appendChild(this.bottomSpacer);
+        this.adjustBottomSpacer(topHeight, estimatedWindowHeight);
+        return true;
+    }
+
+    createSpacer(height) {
+        const spacer = document.createElement('div');
+        spacer.className = 'virtual-spacer flex-shrink-0';
+        spacer.style.height = `${Math.max(0, height)}px`;
+        spacer.setAttribute('aria-hidden', 'true');
+        return spacer;
+    }
+
+    windowOffset(start) {
+        if (this.totalEntries <= this.windowSize) return 0;
+        const estimatedWindowHeight = this.windowSize * 64;
+        const availableHeight = Math.max(0, this.virtualHeight - estimatedWindowHeight);
+        return start / (this.totalEntries - this.windowSize) * availableHeight;
+    }
+
+    adjustBottomSpacer(topHeight, fallbackHeight) {
+        const elements = [...this.container.querySelectorAll('[data-message-index]')];
+        const renderedHeight = elements.length > 0
+            ? elements.reduce((height, element) => height + element.getBoundingClientRect().height, 0)
+            : fallbackHeight;
+        this.bottomSpacer.style.height = `${Math.max(0, this.virtualHeight - topHeight - renderedHeight)}px`;
+    }
+
+    indexToOffset(index) {
+        if (this.totalEntries <= 1) return 0;
+        const movableHeight = Math.max(0, this.virtualHeight - this.container.clientHeight);
+        return index / (this.totalEntries - 1) * movableHeight;
+    }
+
+    offsetToIndex(offset) {
+        if (this.totalEntries <= 1) return 0;
+        const movableHeight = Math.max(1, this.virtualHeight - this.container.clientHeight);
+        return Math.max(0, Math.min(
+            this.totalEntries - 1,
+            Math.round(offset / movableHeight * (this.totalEntries - 1))
+        ));
     }
     
     
     /**
      * 렌더링 완료 후 처리
      */
-    finishRendering(isInitial) {
-        // 스크롤을 맨 아래로 (DOM 렌더링 완료 후)
-        if (isInitial) {
-            // 초기 렌더링 시 로딩 인디케이터와 함께 스크롤
-            setTimeout(() => {
-                this.scrollToBottomWithLoading();
-            }, 100);
-        } else {
-            // 사용자 변경 시에는 바로 스크롤
-            setTimeout(() => {
-                this.scrollToBottom();
-            }, 100);
+    finishRendering(isInitial, shouldScrollToBottom = true) {
+        if (shouldScrollToBottom) {
+            this.scrollToBottomWithLoading();
         }
         
         // 채팅방 헤더 업데이트
@@ -83,18 +162,7 @@ class ChatRenderer {
      * @param {Object} chatData - 채팅 데이터
      */
     determineCurrentUser(chatData) {
-        const messages = chatData.messages.filter(msg => msg.type === 'message');
-        const senderCount = {};
-        
-        messages.forEach(msg => {
-            senderCount[msg.sender] = (senderCount[msg.sender] || 0) + 1;
-        });
-        
-        // 사용자 목록 저장 (메시지 개수 순)
-        this.users = Object.keys(senderCount).map(user => ({
-            name: user,
-            messageCount: senderCount[user]
-        })).sort((a, b) => b.messageCount - a.messageCount);
+        this.users = chatData.users || [];
         
         // 채팅방 제목에서 첫 번째 사람은 상대방(왼쪽)으로 설정
         // 제목 형태: "공주🎀 님과 카카오톡 대화" -> "공주🎀"는 상대방(왼쪽)
@@ -110,7 +178,7 @@ class ChatRenderer {
             }
         } else {
             // 제목에서 추출할 수 없으면 메시지가 가장 많은 사람으로
-            this.currentUser = this.users[0].name;
+            this.currentUser = this.users[0]?.name || '';
         }
     }
     
@@ -198,11 +266,8 @@ class ChatRenderer {
                     // 사용자 변경
                     this.currentUser = user.name;
 
-                    // 약간의 지연 후 렌더링 (자연스러운 로딩 경험)
-                    setTimeout(() => {
-                        this.render(this.chatData, false); // 재렌더링 시에는 isInitial = false
-                        this.showUserSwitchingLoading(false);
-                    }, 100);
+                    this.render(this.chatData, this.store, false)
+                        .finally(() => this.showUserSwitchingLoading(false));
                 }
             });
 
@@ -281,10 +346,11 @@ class ChatRenderer {
      * 날짜 구분선 렌더링
      * @param {Object} message - 날짜 메시지 객체
      */
-    renderDateSeparator(message) {
+    renderDateSeparator(message, index) {
         const dateDiv = document.createElement('div');
         dateDiv.className = 'flex justify-center my-4';
         dateDiv.setAttribute('data-date', message.date); // 날짜 데이터 속성 추가
+        dateDiv.setAttribute('data-message-index', index);
         dateDiv.innerHTML = `
             <div class="bg-black bg-opacity-20 text-white text-xs px-3 py-1 rounded-full">
                 ${message.date}
@@ -308,8 +374,8 @@ class ChatRenderer {
      */
     renderMessage(message, index, messages) {
         const isMyMessage = message.sender === this.currentUser;
-        const prevMessage = index > 0 ? messages[index - 1] : null;
-        const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
+        const prevMessage = messages.get(index - 1) || null;
+        const nextMessage = messages.get(index + 1) || null;
         
         // 연속 메시지 체크
         const isFirstInGroup = !prevMessage || 
@@ -321,6 +387,7 @@ class ChatRenderer {
         
         const messageDiv = document.createElement('div');
         messageDiv.className = `flex mb-2 ${isMyMessage ? 'justify-end' : 'justify-start'}`;
+        messageDiv.setAttribute('data-message-index', index);
         
         if (isMyMessage) {
             messageDiv.innerHTML = this.renderMyMessage(message, isFirstInGroup, isLastInGroup);
@@ -511,12 +578,8 @@ class ChatRenderer {
      */
     scrollToBottomWithLoading() {
         if (!this.container) return;
-        
-        // 스크롤을 부드럽게 맨 아래로
-        this.container.scrollTo({
-            top: this.container.scrollHeight,
-            behavior: 'smooth'
-        });
+
+        this.scrollToBottom();
     }
     
     /**
@@ -533,6 +596,28 @@ class ChatRenderer {
             this.container.scrollTop = this.container.scrollHeight;
         });
     }
+
+    async scrollToIndex(index, highlight = true) {
+        if (!this.chatData || index < 0 || index >= this.totalEntries) return;
+
+        this.container.scrollTop = this.indexToOffset(index);
+        if (index < this.renderStart || index >= this.renderEnd) {
+            await this.renderWindow(index - Math.floor(this.windowSize / 2));
+        }
+
+        const target = this.container.querySelector(`[data-message-index="${index}"]`);
+        if (!target) return;
+
+        target.scrollIntoView({ behavior: 'auto', block: 'center' });
+        if (highlight) {
+            const previousHighlight = this.container.querySelector('.search-highlight');
+            if (previousHighlight) {
+                previousHighlight.classList.remove('search-highlight');
+            }
+            target.classList.add('search-highlight');
+            setTimeout(() => target.classList.remove('search-highlight'), 3000);
+        }
+    }
     
     /**
      * 스크롤 날짜 표시기 설정
@@ -545,16 +630,15 @@ class ChatRenderer {
      * 스크롤 리스너 연결
      */
     attachScrollListener() {
-        // 스크롤 이벤트 쓰로틀링 (대용량 데이터 최적화)
-        let scrollTimeout;
         this.container.addEventListener('scroll', () => {
-            if (scrollTimeout) return;
-            
-            scrollTimeout = setTimeout(() => {
+            if (this.virtualScrollFrame) return;
+
+            this.virtualScrollFrame = requestAnimationFrame(() => {
+                this.handleVirtualScroll();
                 this.handleScroll();
-                scrollTimeout = null;
-            }, 50);
-        });
+                this.virtualScrollFrame = null;
+            });
+        }, { passive: true });
         
         // DOM이 완전히 로드된 후 버튼 이벤트 연결
         setTimeout(() => {
@@ -566,18 +650,26 @@ class ChatRenderer {
             }
         }, 100);
     }
+
+    handleVirtualScroll() {
+        if (!this.chatData || this.totalEntries <= this.windowSize) return;
+
+        const visibleIndex = this.offsetToIndex(this.container.scrollTop);
+        if (visibleIndex < this.renderStart + this.windowBuffer || visibleIndex >= this.renderEnd - this.windowBuffer) {
+            const start = Math.max(0, Math.min(
+                visibleIndex - Math.floor(this.windowSize / 2),
+                this.totalEntries - this.windowSize
+            ));
+            if (start !== this.renderStart) {
+                this.renderWindow(start);
+            }
+        }
+    }
     
     /**
      * 스크롤 이벤트 처리 (최적화됨)
      */
     handleScroll() {
-        // 대용량 데이터일 때 일부 기능 제한
-        if (this.isLargeDataset && this.dateElements.length > 100) {
-            // 날짜 표시 기능 간소화
-            this.handleScrollLightweight();
-            return;
-        }
-        
         const scrollDateIndicator = document.getElementById('scroll-date-indicator');
         const currentScrollDate = document.getElementById('current-scroll-date');
         
@@ -619,36 +711,6 @@ class ChatRenderer {
             }, 3000);
         }
     }
-    
-    /**
-     * 경량화된 스크롤 처리 (대용량 데이터용)
-     */
-    handleScrollLightweight() {
-        // 최소한의 날짜 표시만 처리
-        const scrollDateIndicator = document.getElementById('scroll-date-indicator');
-        const currentScrollDate = document.getElementById('current-scroll-date');
-        
-        if (!scrollDateIndicator || !currentScrollDate) {
-            return;
-        }
-        
-        // 스크롤 위치 기반으로 대략적인 날짜 추정
-        const scrollPercentage = this.container.scrollTop / (this.container.scrollHeight - this.container.clientHeight);
-        const dateIndex = Math.floor(scrollPercentage * this.dateElements.length);
-        
-        if (dateIndex < this.dateElements.length && this.dateElements[dateIndex]) {
-            currentScrollDate.textContent = this.dateElements[dateIndex].date;
-            scrollDateIndicator.classList.remove('scroll-date-hide');
-            scrollDateIndicator.classList.add('scroll-date-show');
-            
-            clearTimeout(this.scrollTimeout);
-            this.scrollTimeout = setTimeout(() => {
-                scrollDateIndicator.classList.remove('scroll-date-show');
-                scrollDateIndicator.classList.add('scroll-date-hide');
-            }, 2000); // 대용량에서는 더 빨리 숨김
-        }
-    }
-    
 }
 
 // 전역으로 클래스 내보내기
