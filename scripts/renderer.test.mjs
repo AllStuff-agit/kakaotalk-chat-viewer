@@ -3,13 +3,34 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 function createElement(tagName = 'div') {
+    let innerHTML = '';
+    let textContent = '';
     return {
         addEventListener: () => {},
         classList: { add: () => {}, remove: () => {} },
         className: '',
         dataset: {},
         getBoundingClientRect: () => ({ height: 64, top: 0 }),
-        innerHTML: '',
+        get innerHTML() {
+            if (textContent) {
+                return textContent
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+            return innerHTML;
+        },
+        set innerHTML(value) {
+            innerHTML = value;
+            textContent = '';
+        },
+        get textContent() {
+            return textContent;
+        },
+        set textContent(value) {
+            textContent = value;
+        },
         setAttribute(name, value) {
             if (name === 'data-message-index') this.dataset.messageIndex = String(value);
         },
@@ -101,4 +122,7 @@ assert.equal(renderer.renderStart, 500000, '늦게 끝난 이전 위치 조회�
 renderer.totalEntries = 1_000_000;
 renderer.virtualHeight = 10_000_000;
 assert.ok(Math.abs(renderer.offsetToIndex(renderer.indexToOffset(500000)) - 500000) <= 1);
+const safeLink = renderer.renderLinkMessage('https://example.com/" onclick="alert(1) <img>');
+assert.equal(safeLink.includes('<img>'), false, '채팅 내용의 HTML을 실행하면 안 된다.');
+assert.equal(safeLink.includes('rel="noopener noreferrer"'), true);
 console.log('renderer storage virtualization check passed');

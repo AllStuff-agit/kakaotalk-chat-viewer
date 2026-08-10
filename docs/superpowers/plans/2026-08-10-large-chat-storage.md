@@ -121,17 +121,17 @@ search(query, limit = 200) {
 
 - [ ] **Step 4: Worker에 IndexedDB 저장과 조회 구현**
 
-DB 이름은 `kakaotalk-chat-viewer`, object store는 `messages`, `keyPath: 'index'`로 고정한다. 가져오기 시작 시 store를 비우고 `File.stream().getReader()`와 `TextDecoder`로 읽는다. 1,000개 단위 트랜잭션으로 저장하며 메타데이터에 참여자별 개수와 `{ date, index }` 목록을 포함한다.
+DB 이름은 `kakaotalk-chat-viewer`, object store는 `chunks`, `keyPath: 'start'`로 고정한다. 가져오기 시작 시 store를 비우고 `File.stream().getReader()`와 `TextDecoder`로 읽는다. 5,000개 단위 청크로 저장하며 메타데이터에 참여자별 개수와 `{ date, index }` 목록을 포함한다.
 
 ```js
 async function putBatch(entries) {
     const transaction = database.transaction('messages', 'readwrite');
-    entries.forEach(entry => transaction.objectStore('messages').put(entry));
+    transaction.objectStore('chunks').put({ start: entries[0].index, entries });
     await transactionDone(transaction);
 }
 ```
 
-범위 조회는 `IDBKeyRange.bound(start, start + count - 1)`, 검색은 `openCursor(null, 'prev')`를 사용한다. 검색 결과는 일반 문자열만 반환한다.
+범위 조회는 필요한 청크만 읽어 최대 400개를 잘라 반환하고, 검색은 청크 `openCursor(null, 'prev')`를 사용한다. 검색 결과는 일반 문자열만 반환한다.
 
 - [ ] **Step 5: 클라이언트 검사 실행**
 

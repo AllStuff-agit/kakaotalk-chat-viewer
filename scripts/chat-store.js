@@ -23,7 +23,9 @@ class ChatStore {
         this.pending.delete(message.id);
 
         if (message.error) {
-            request.reject(new Error(message.error));
+            const error = new Error(message.error);
+            error.name = message.errorName || 'Error';
+            request.reject(error);
         } else {
             request.resolve(message.result);
         }

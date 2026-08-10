@@ -5,9 +5,10 @@
 
 class KakaoTalkViewer {
     constructor() {
-        this.parser = new KakaoTalkParser();
         this.renderer = new ChatRenderer('chat-messages');
         this.currentChatData = null;
+        this.store = null;
+        this.searchGeneration = 0;
         this.isProcessingFile = false; // 파일 처리 중복 방지 플래그
 
         // 데스크톱 전용 체크
@@ -89,17 +90,6 @@ class KakaoTalkViewer {
         this.initFontSizeControls();
         this.currentFontSize = 14; // 기본 폰트 크기
         
-        // 모바일 검색 기능
-        this.initMobileSearch();
-
-        // 모바일/태블릿용 파일 업로드 기능
-        this.initMobileFileUpload();
-
-        // 모바일 정보 패널 파일 업로드 기능
-        this.initMobileInfoFileUpload();
-
-        // 모바일 메뉴 시스템
-        this.initMobileMenu();
     }
     
     /**
@@ -168,33 +158,52 @@ class KakaoTalkViewer {
         }
 
         this.isProcessingFile = true;
+        let openedStore = false;
 
         try {
             this.showLoading(true);
             this.hideError();
-            
-            // 파일 읽기
-            const content = await this.readFile(file);
-            
-            // 파싱
-            this.currentChatData = this.parser.parse(content);
+
+            if (!this.supportsLargeFiles()) {
+                throw new Error('최신 Chrome 또는 Edge 브라우저에서 열어주세요.');
+            }
+
+            this.store?.close();
+            this.store = new ChatStore();
+            openedStore = true;
+            this.currentChatData = null;
+            this.renderer.chatData = null;
+            document.getElementById('chat-container').classList.add('hidden');
+            document.getElementById('welcome-screen').classList.remove('hidden');
+            navigator.storage?.persist?.().catch(() => {});
+            this.currentChatData = await this.store.importFile(
+                file,
+                progress => this.updateImportProgress(progress)
+            );
             
             // 유효성 검증
             if (!this.validateChatData(this.currentChatData)) {
-                this.showError('올바른 카카오톡 채팅 내보내기 파일이 아닙니다.');
-                this.isProcessingFile = false;
-                return;
+                throw new Error('올바른 카카오톡 채팅 내보내기 파일이 아닙니다.');
             }
             
             // UI 업데이트
             this.updateChatInfo(this.currentChatData);
             this.extractAvailableDates(this.currentChatData); // 사용 가능한 날짜 추출
-            this.renderer.render(this.currentChatData);
+            await this.renderer.render(this.currentChatData, this.store);
             this.showChatContainer();
             
         } catch (error) {
             console.error('파일 처리 오류:', error);
-            this.showError('파일을 처리하는 중 오류가 발생했습니다: ' + error.message);
+            if (openedStore) {
+                this.store?.close();
+                this.store = null;
+                this.currentChatData = null;
+            }
+            if (error.name === 'QuotaExceededError') {
+                this.showError('브라우저 저장 공간이 부족합니다. 기기의 여유 공간을 확보한 뒤 다시 시도해주세요.');
+            } else {
+                this.showError('파일을 처리하는 중 오류가 발생했습니다: ' + error.message);
+            }
         } finally {
             this.showLoading(false);
             this.isProcessingFile = false; // 플래그 초기화
@@ -213,30 +222,15 @@ class KakaoTalkViewer {
             return false;
         }
         
-        // 파일 크기 검증 (10MB 제한)
-        if (file.size > 10 * 1024 * 1024) {
-            this.showError('파일 크기가 너무 큽니다. 10MB 이하의 파일을 선택해주세요.');
-            return false;
-        }
-        
         return true;
     }
-    
-    /**
-     * 파일 읽기
-     * @param {File} file - 읽을 파일
-     * @returns {Promise<string>} 파일 내용
-     */
-    readFile(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다.'));
-            
-            // UTF-8로 읽기 시도, 실패하면 다른 인코딩으로 재시도
-            reader.readAsText(file, 'utf-8');
-        });
+
+    supportsLargeFiles() {
+        return typeof Worker !== 'undefined' &&
+            typeof indexedDB !== 'undefined' &&
+            typeof File !== 'undefined' &&
+            typeof File.prototype.stream === 'function' &&
+            typeof TextDecoder !== 'undefined';
     }
     
     /**
@@ -247,8 +241,8 @@ class KakaoTalkViewer {
     validateChatData(chatData) {
         return chatData && 
                chatData.title && 
-               chatData.messages && 
-               chatData.messages.length > 0;
+               chatData.totalEntries > 0 &&
+               chatData.totalMessages > 0;
     }
     
     /**
@@ -256,12 +250,12 @@ class KakaoTalkViewer {
      * @param {Object} chatData - 채팅 데이터
      */
     updateChatInfo(chatData) {
-        const stats = this.parser.getStats();
+        const totalMessages = chatData.totalMessages;
 
         // PC용 채팅방 정보 업데이트
         document.getElementById('chat-title').textContent = chatData.title;
         document.getElementById('save-date').textContent = chatData.saveDate;
-        document.getElementById('message-count').textContent = stats.totalMessages.toLocaleString();
+        document.getElementById('message-count').textContent = totalMessages.toLocaleString();
         document.getElementById('chat-info').classList.remove('hidden');
 
         // 모바일용 채팅방 정보 업데이트 (요소가 존재할 경우에만)
@@ -269,7 +263,7 @@ class KakaoTalkViewer {
         if (mobileChatTitle) {
             mobileChatTitle.textContent = chatData.title;
             document.getElementById('mobile-save-date').textContent = chatData.saveDate;
-            document.getElementById('mobile-message-count').textContent = stats.totalMessages.toLocaleString();
+            document.getElementById('mobile-message-count').textContent = totalMessages.toLocaleString();
             document.getElementById('mobile-chat-info').classList.remove('hidden');
         }
     }
@@ -280,13 +274,6 @@ class KakaoTalkViewer {
     showChatContainer() {
         document.getElementById('chat-container').classList.remove('hidden');
         document.getElementById('welcome-screen').classList.add('hidden');
-        
-        // 채팅방이 표시된 후 스크롤을 맨 아래로 (추가 안전장치)
-        setTimeout(() => {
-            if (this.renderer) {
-                this.renderer.scrollToBottom();
-            }
-        }, 200);
     }
     
     /**
@@ -299,6 +286,8 @@ class KakaoTalkViewer {
         const mobileInfoLoading = document.getElementById('mobile-info-loading');
 
         if (show) {
+            const loadingText = document.getElementById('loading-text');
+            if (loadingText) loadingText.textContent = '분석 준비 중...';
             if (loading) loading.classList.remove('hidden');
             if (mobileLoading) mobileLoading.classList.remove('hidden');
             if (mobileInfoLoading) mobileInfoLoading.classList.remove('hidden');
@@ -307,6 +296,13 @@ class KakaoTalkViewer {
             if (mobileLoading) mobileLoading.classList.add('hidden');
             if (mobileInfoLoading) mobileInfoLoading.classList.add('hidden');
         }
+    }
+
+    updateImportProgress({ loaded, total }) {
+        const loadingText = document.getElementById('loading-text');
+        if (!loadingText || !total) return;
+        const percentage = Math.min(100, Math.round(loaded / total * 100));
+        loadingText.textContent = `분석 및 저장 중... ${percentage}%`;
     }
     
     /**
@@ -374,21 +370,27 @@ class KakaoTalkViewer {
      * 검색 처리
      * @param {string} query - 검색어
      */
-    handleSearch(query) {
+    async handleSearch(query) {
         if (!query.trim() || !this.currentChatData) {
             this.clearSearchResults();
             return;
         }
-        
+
+        const generation = ++this.searchGeneration;
         // 로딩 표시
         this.showSearchLoading();
-        
-        // 약간의 지연을 두어 로딩 상태를 보여줌
-        setTimeout(() => {
-            const results = this.searchMessages(query);
+
+        try {
+            const results = await this.searchMessages(query);
+            if (generation !== this.searchGeneration) return;
             this.hideSearchLoading();
             this.displaySearchResults(results, query);
-        }, 100);
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                this.hideSearchLoading();
+                this.showError('검색 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
     }
     
     /**
@@ -396,33 +398,13 @@ class KakaoTalkViewer {
      * @param {string} query - 검색어
      * @returns {Array} 검색 결과
      */
-    searchMessages(query) {
-        if (!this.currentChatData || !this.currentChatData.messages) {
-            return [];
-        }
-        
-        const results = [];
-        const lowerQuery = query.toLowerCase();
-        let currentDate = '';
-        
-        this.currentChatData.messages.forEach((message, index) => {
-            // 날짜 메시지를 만나면 현재 날짜 업데이트
-            if (message.type === 'date') {
-                currentDate = message.date;
-            } else if (message.type === 'message' && 
-                       message.content && 
-                       message.content.toLowerCase().includes(lowerQuery)) {
-                results.push({
-                    ...message,
-                    index: index,
-                    date: currentDate,
-                    highlightedContent: this.highlightSearchTerm(message.content, query)
-                });
-            }
-        });
-        
-        // 최신순으로 정렬 (인덱스가 클수록 최신)
-        return results.sort((a, b) => b.index - a.index);
+    async searchMessages(query) {
+        if (!this.currentChatData || !this.store) return [];
+        const results = await this.store.search(query, 200);
+        return results.map(message => ({
+            ...message,
+            highlightedContent: this.highlightSearchTerm(message.content, query)
+        }));
     }
     
     /**
@@ -432,8 +414,22 @@ class KakaoTalkViewer {
      * @returns {string} 하이라이트된 내용
      */
     highlightSearchTerm(content, query) {
-        const regex = new RegExp(`(${query})`, 'gi');
-        return content.replace(regex, '<mark class="bg-yellow-300">$1</mark>');
+        const escapedContent = this.escapeHtml(content);
+        const escapedQuery = this.escapeHtml(query);
+        const regexQuery = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return escapedContent.replace(
+            new RegExp(`(${regexQuery})`, 'gi'),
+            '<mark class="bg-yellow-300">$1</mark>'
+        );
+    }
+
+    escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
     
     /**
@@ -477,11 +473,12 @@ class KakaoTalkViewer {
      */
     displaySearchResults(results, query) {
         const resultsContainer = document.getElementById('search-results');
+        const safeQuery = this.escapeHtml(query);
         
         if (results.length === 0) {
             resultsContainer.innerHTML = `
                 <div class="text-center text-gray-500 text-sm py-8">
-                    "${query}"에 대한 검색 결과가 없습니다
+                    "${safeQuery}"에 대한 검색 결과가 없습니다
                 </div>
             `;
             return;
@@ -489,7 +486,7 @@ class KakaoTalkViewer {
         
         const resultsHTML = `
             <div class="mb-4">
-                <div class="text-sm text-gray-600 mb-3">검색 결과 ${results.length}개 (최신순)</div>
+                <div class="text-sm text-gray-600 mb-3">최근 검색 결과 ${results.length}개 (최대 200개)</div>
             </div>
             <div class="space-y-3">
                 ${results.map((result, index) => `
@@ -497,10 +494,10 @@ class KakaoTalkViewer {
                          onclick="window.scrollToMessage(${result.index})">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center">
-                                <span class="text-sm font-medium text-gray-700">${result.sender}</span>
-                                <span class="text-xs text-gray-500 ml-2">${result.time}</span>
+                                <span class="text-sm font-medium text-gray-700">${this.escapeHtml(result.sender)}</span>
+                                <span class="text-xs text-gray-500 ml-2">${this.escapeHtml(result.time)}</span>
                             </div>
-                            <div class="text-xs text-gray-400">${this.formatSearchDate(result.date)}</div>
+                            <div class="text-xs text-gray-400">${this.escapeHtml(this.formatSearchDate(result.date))}</div>
                         </div>
                         <div class="text-sm text-gray-800 leading-relaxed">
                             ${result.highlightedContent}
@@ -719,19 +716,17 @@ class KakaoTalkViewer {
      */
     extractAvailableDates(chatData) {
         this.availableDates.clear();
-        
-        if (!chatData || !chatData.messages) return;
-        
-        chatData.messages.forEach(message => {
-            if (message.type === 'date' && message.date) {
-                // "2025년 5월 20일 화요일" 형식을 "2025-05-20" 형식으로 변환
-                const match = message.date.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
-                if (match) {
-                    const [, year, month, day] = match;
-                    const dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                    this.availableDates.add(dateString);
-                }
-            }
+        this.dateIndexes = new Map();
+
+        if (!chatData?.dates) return;
+
+        chatData.dates.forEach(({ date, index }) => {
+            const match = date.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+            if (!match) return;
+            const [, year, month, day] = match;
+            const dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            this.availableDates.add(dateString);
+            if (!this.dateIndexes.has(dateString)) this.dateIndexes.set(dateString, index);
         });
     }
     
@@ -740,64 +735,8 @@ class KakaoTalkViewer {
      * @param {string} dateString - 날짜 문자열 (예: "2025-05-20")
      */
     scrollToDate(dateString) {
-        if (!this.currentChatData || !this.currentChatData.messages) return;
-        
-        // 날짜 문자열을 "2025년 5월 20일" 형식으로 변환
-        const [year, month, day] = dateString.split('-');
-        const targetDate = `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
-        
-        // 해당 날짜의 메시지 찾기
-        for (let i = 0; i < this.currentChatData.messages.length; i++) {
-            const message = this.currentChatData.messages[i];
-            if (message.type === 'date' && message.date.includes(targetDate)) {
-                // 해당 날짜로 스크롤
-                const chatMessages = document.getElementById('chat-messages');
-                const messageElements = chatMessages.children;
-                
-                if (i < messageElements.length) {
-                    messageElements[i].scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    
-                    // 스크롤 완료 후 하이라이트 효과 적용 (약간의 지연)
-                    setTimeout(() => {
-                        // 기존 하이라이트 제거
-                        const previousHighlight = chatMessages.querySelector('.search-highlight');
-                        if (previousHighlight) {
-                            previousHighlight.classList.remove('search-highlight');
-                        }
-                        
-                        // 날짜 구분선 하이라이트 효과 (검색 결과와 동일한 효과)
-                        messageElements[i].classList.add('search-highlight');
-                        
-                        // 전역 클릭 리스너 추가 (한 번만)
-                        if (!window.searchHighlightListenerAdded) {
-                            window.searchHighlightListenerAdded = true;
-                            document.addEventListener('click', function removeHighlight(e) {
-                                // 검색 사이드바나 달력 클릭은 무시
-                                const searchSidebar = document.getElementById('search-sidebar');
-                                const calendarPopup = document.getElementById('calendar-popup');
-                                if ((searchSidebar && searchSidebar.contains(e.target)) || 
-                                    (calendarPopup && calendarPopup.contains(e.target))) {
-                                    return;
-                                }
-                                
-                                // 하이라이트 제거
-                                const highlighted = chatMessages.querySelector('.search-highlight');
-                                if (highlighted) {
-                                    highlighted.classList.remove('search-highlight');
-                                }
-                                
-                                // 이벤트 리스너 제거
-                                document.removeEventListener('click', removeHighlight);
-                                window.searchHighlightListenerAdded = false;
-                            });
-                        }
-                    }, 300); // 300ms 후에 하이라이트 적용
-                }
-                
-                // 달력은 열어두고 스크롤만 실행 (달력 닫기 제거)
-                break;
-            }
-        }
+        const index = this.dateIndexes?.get(dateString);
+        if (index !== undefined) this.renderer.scrollToIndex(index);
     }
     
     /**
@@ -980,99 +919,7 @@ class KakaoTalkViewer {
     }
 }
 
-// 전역 함수 - 메시지로 스크롤
-window.scrollToMessage = function(messageIndex) {
-    const chatMessages = document.getElementById('chat-messages');
-    const messageElements = chatMessages.children;
-    
-    if (messageIndex < messageElements.length) {
-        const targetElement = messageElements[messageIndex];
-        
-        // 스크롤 시작
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // 스크롤 완료 후 하이라이트 효과 적용 (약간의 지연)
-        setTimeout(() => {
-            // 기존 하이라이트 제거
-            const previousHighlight = chatMessages.querySelector('.search-highlight');
-            if (previousHighlight) {
-                previousHighlight.classList.remove('search-highlight');
-            }
-            
-            // 새로운 하이라이트 효과 (클릭하기 전까지 유지)
-            targetElement.classList.add('search-highlight');
-            
-            // 전역 클릭 리스너 추가 (한 번만)
-            if (!window.searchHighlightListenerAdded) {
-                window.searchHighlightListenerAdded = true;
-                document.addEventListener('click', function removeHighlight(e) {
-                    // 검색 사이드바 클릭은 무시
-                    const searchSidebar = document.getElementById('search-sidebar');
-                    if (searchSidebar && searchSidebar.contains(e.target)) {
-                        return;
-                    }
-                    
-                    // 하이라이트 제거
-                    const highlighted = chatMessages.querySelector('.search-highlight');
-                    if (highlighted) {
-                        highlighted.classList.remove('search-highlight');
-                    }
-                    
-                    // 이벤트 리스너 제거
-                    document.removeEventListener('click', removeHighlight);
-                    window.searchHighlightListenerAdded = false;
-                });
-            }
-        }, 300); // 300ms 후에 하이라이트 적용
-    }
-}
-
-// 전역 함수 - 메시지로 스크롤
-window.scrollToMessage = function(messageIndex) {
-    const chatMessages = document.getElementById('chat-messages');
-    const messageElements = chatMessages.children;
-    
-    if (messageIndex < messageElements.length) {
-        const targetElement = messageElements[messageIndex];
-        
-        // 스크롤 시작
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // 스크롤 완료 후 하이라이트 효과 적용 (약간의 지연)
-        setTimeout(() => {
-            // 기존 하이라이트 제거
-            const previousHighlight = chatMessages.querySelector('.search-highlight');
-            if (previousHighlight) {
-                previousHighlight.classList.remove('search-highlight');
-            }
-            
-            // 새로운 하이라이트 효과 (클릭하기 전까지 유지)
-            targetElement.classList.add('search-highlight');
-            
-            // 전역 클릭 리스너 추가 (한 번만)
-            if (!window.searchHighlightListenerAdded) {
-                window.searchHighlightListenerAdded = true;
-                document.addEventListener('click', function removeHighlight(e) {
-                    // 검색 사이드바 클릭은 무시
-                    const searchSidebar = document.getElementById('search-sidebar');
-                    if (searchSidebar && searchSidebar.contains(e.target)) {
-                        return;
-                    }
-                    
-                    // 하이라이트 제거
-                    const highlighted = chatMessages.querySelector('.search-highlight');
-                    if (highlighted) {
-                        highlighted.classList.remove('search-highlight');
-                    }
-                    
-                    // 이벤트 리스너 제거
-                    document.removeEventListener('click', removeHighlight);
-                    window.searchHighlightListenerAdded = false;
-                });
-            }
-        }, 300); // 300ms 후에 하이라이트 적용
-    }
-};
+window.scrollToMessage = messageIndex => window.chatRenderer?.scrollToIndex(messageIndex);
 
 // KakaoTalkViewer 클래스의 확장 메서드들
 KakaoTalkViewer.prototype.initMobileSearch = function() {
@@ -1165,22 +1012,9 @@ KakaoTalkViewer.prototype.initMobileSearch = function() {
 /**
  * 모바일 검색 실행
  */
-KakaoTalkViewer.prototype.performMobileSearch = function(searchTerm) {
+KakaoTalkViewer.prototype.performMobileSearch = async function(searchTerm) {
         if (!this.currentChatData) return;
-        
-        const results = [];
-        const messages = this.currentChatData.messages.filter(msg => msg.type === 'message');
-        
-        messages.forEach((message, index) => {
-            if (message.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                message.sender.toLowerCase().includes(searchTerm.toLowerCase())) {
-                results.push({
-                    ...message,
-                    index: index
-                });
-            }
-        });
-        
+        const results = await this.searchMessages(searchTerm);
         this.displayMobileSearchResults(results, searchTerm);
 };
 
@@ -1203,16 +1037,8 @@ KakaoTalkViewer.prototype.displayMobileSearchResults = function(results, searchT
         }
         
         const resultHtml = results.map(result => {
-            // 검색어 하이라이트 처리
-            const highlightedContent = result.content.replace(
-                new RegExp(`(${searchTerm})`, 'gi'),
-                '<mark class="bg-yellow-200 px-1 rounded">$1</mark>'
-            );
-            
-            const highlightedSender = result.sender.replace(
-                new RegExp(`(${searchTerm})`, 'gi'),
-                '<mark class="bg-yellow-200 px-1 rounded">$1</mark>'
-            );
+            const highlightedContent = result.highlightedContent;
+            const highlightedSender = this.escapeHtml(result.sender);
             
             return `
                 <div class="p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors search-result-item"
@@ -1224,10 +1050,10 @@ KakaoTalkViewer.prototype.displayMobileSearchResults = function(results, searchT
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center space-x-2 mb-1">
                                 <span class="font-medium text-sm text-gray-900">${highlightedSender}</span>
-                                <span class="text-xs text-gray-500">${result.time}</span>
+                                <span class="text-xs text-gray-500">${this.escapeHtml(result.time)}</span>
                             </div>
                             <div class="text-sm text-gray-700 break-words">${highlightedContent}</div>
-                            <div class="text-xs text-gray-400 mt-1">${result.date}</div>
+                            <div class="text-xs text-gray-400 mt-1">${this.escapeHtml(result.date)}</div>
                         </div>
                     </div>
                 </div>
@@ -1261,46 +1087,7 @@ KakaoTalkViewer.prototype.displayMobileSearchResults = function(results, searchT
  * 모바일 검색 결과로 스크롤
  */
 KakaoTalkViewer.prototype.scrollToMobileSearchResult = function(messageIndex) {
-        if (!this.currentChatData) return;
-        
-        const chatMessages = document.getElementById('chat-messages');
-        const messageElements = chatMessages.children;
-        
-        // 실제 메시지 인덱스 찾기 (날짜 구분선 포함)
-        let actualIndex = 0;
-        let messageCount = 0;
-        
-        for (let i = 0; i < this.currentChatData.messages.length; i++) {
-            if (this.currentChatData.messages[i].type === 'message') {
-                if (messageCount === messageIndex) {
-                    actualIndex = i;
-                    break;
-                }
-                messageCount++;
-            }
-        }
-        
-        if (actualIndex < messageElements.length) {
-            messageElements[actualIndex].scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'center' 
-            });
-            
-            // 하이라이트 효과
-            setTimeout(() => {
-                const previousHighlight = chatMessages.querySelector('.search-highlight');
-                if (previousHighlight) {
-                    previousHighlight.classList.remove('search-highlight');
-                }
-                
-                messageElements[actualIndex].classList.add('search-highlight');
-                
-                // 하이라이트 자동 제거
-                setTimeout(() => {
-                    messageElements[actualIndex].classList.remove('search-highlight');
-                }, 3000);
-            }, 300);
-        }
+    this.renderer.scrollToIndex(messageIndex);
 };
 
 /**
@@ -1407,42 +1194,7 @@ KakaoTalkViewer.prototype.initMobileCalendarDate = function() {
  * 모바일에서 특정 날짜로 이동
  */
 KakaoTalkViewer.prototype.jumpToMobileDate = function(dateString) {
-        if (!this.currentChatData) return;
-
-        // "2025-05-20" 형태를 "2025년 5월 20일" 형태로 변환
-        const [year, month, day] = dateString.split('-');
-        const targetDate = `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
-
-        for (let i = 0; i < this.currentChatData.messages.length; i++) {
-            const message = this.currentChatData.messages[i];
-            if (message.type === 'date' && message.date.includes(targetDate)) {
-                const chatMessages = document.getElementById('chat-messages');
-                const messageElements = chatMessages.children;
-
-                if (i < messageElements.length) {
-                    messageElements[i].scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-
-                    // 하이라이트 효과
-                    setTimeout(() => {
-                        const previousHighlight = chatMessages.querySelector('.search-highlight');
-                        if (previousHighlight) {
-                            previousHighlight.classList.remove('search-highlight');
-                        }
-
-                        messageElements[i].classList.add('search-highlight');
-
-                        // 하이라이트 자동 제거
-                        setTimeout(() => {
-                            messageElements[i].classList.remove('search-highlight');
-                        }, 3000);
-                    }, 300);
-                }
-                break;
-            }
-        }
+        this.scrollToDate(dateString);
 };
 
 /**

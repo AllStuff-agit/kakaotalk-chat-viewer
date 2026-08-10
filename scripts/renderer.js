@@ -242,7 +242,7 @@ class ChatRenderer {
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
                         <div class="w-6 h-6 bg-gray-300 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
-                            <span class="text-xs font-bold text-gray-600">${user.name[0]}</span>
+                            <span class="text-xs font-bold text-gray-600">${this.escapeHtml(user.name[0])}</span>
                         </div>
                         <span class="truncate font-medium">${this.escapeHtml(user.name)}</span>
                     </div>
@@ -353,7 +353,7 @@ class ChatRenderer {
         dateDiv.setAttribute('data-message-index', index);
         dateDiv.innerHTML = `
             <div class="bg-black bg-opacity-20 text-white text-xs px-3 py-1 rounded-full">
-                ${message.date}
+                ${this.escapeHtml(message.date)}
             </div>
         `;
         
@@ -412,7 +412,7 @@ class ChatRenderer {
         return `
             <div class="flex items-end max-w-[90%] chat-message-container">
                 <div class="text-xs text-gray-500 mr-2 mb-1 ${timeClass} flex-shrink-0">
-                    ${message.time}
+                    ${this.escapeHtml(message.time)}
                 </div>
                 <div class="relative min-w-0 flex-shrink">
                     <div class="bg-my-bubble text-black px-3 py-2 rounded-2xl break-words word-wrap overflow-wrap-anywhere">
@@ -439,7 +439,7 @@ class ChatRenderer {
         return `
             <div class="flex items-start max-w-[90%] chat-message-container">
                 <div class="w-10 h-10 bg-gray-300 rounded-full mr-3 flex-shrink-0 flex items-center justify-center ${profileClass}">
-                    <span class="text-gray-600 text-sm font-bold">${message.sender[0]}</span>
+                    <span class="text-gray-600 text-sm font-bold">${this.escapeHtml(message.sender[0])}</span>
                 </div>
                 <div class="flex-1 min-w-0">
                     ${isFirstInGroup ? `<div class="text-sm font-medium text-gray-700 mb-1 break-words">${this.escapeHtml(message.sender)}</div>` : ''}
@@ -451,7 +451,7 @@ class ChatRenderer {
 
                         </div>
                         <div class="text-xs text-gray-500 ml-2 mb-1 ${timeClass} flex-shrink-0">
-                            ${message.time}
+                            ${this.escapeHtml(message.time)}
                         </div>
                     </div>
                 </div>
@@ -521,7 +521,10 @@ class ChatRenderer {
      */
     renderLinkMessage(content) {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
-        return content.replace(urlRegex, '<a href="$1" target="_blank" class="text-blue-500 underline">$1</a>');
+        return this.escapeHtml(content).replace(
+            urlRegex,
+            '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-500 underline">$1</a>'
+        );
     }
     
     /**
@@ -600,10 +603,10 @@ class ChatRenderer {
     async scrollToIndex(index, highlight = true) {
         if (!this.chatData || index < 0 || index >= this.totalEntries) return;
 
-        this.container.scrollTop = this.indexToOffset(index);
         if (index < this.renderStart || index >= this.renderEnd) {
             await this.renderWindow(index - Math.floor(this.windowSize / 2));
         }
+        this.container.scrollTop = this.indexToOffset(index);
 
         const target = this.container.querySelector(`[data-message-index="${index}"]`);
         if (!target) return;

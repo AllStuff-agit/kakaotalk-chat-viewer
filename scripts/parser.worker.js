@@ -1,8 +1,8 @@
 importScripts('parser.js');
 
 const DATABASE_NAME = 'kakaotalk-chat-viewer';
-const STORE_NAME = 'messages';
-const BATCH_SIZE = 1000;
+const STORE_NAME = 'chunks';
+const BATCH_SIZE = 5000;
 let databasePromise;
 let activeSearchId = 0;
 
@@ -25,10 +25,13 @@ function openDatabase() {
     if (databasePromise) return databasePromise;
 
     databasePromise = new Promise((resolve, reject) => {
-        const request = indexedDB.open(DATABASE_NAME, 1);
+        const request = indexedDB.open(DATABASE_NAME, 2);
         request.addEventListener('upgradeneeded', () => {
+            if (request.result.objectStoreNames.contains('messages')) {
+                request.result.deleteObjectStore('messages');
+            }
             if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-                request.result.createObjectStore(STORE_NAME, { keyPath: 'index' });
+                request.result.createObjectStore(STORE_NAME, { keyPath: 'start' });
             }
         });
         request.addEventListener('success', () => resolve(request.result));
@@ -49,8 +52,7 @@ async function putBatch(entries) {
     if (entries.length === 0) return;
     const database = await openDatabase();
     const transaction = database.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    entries.forEach(entry => store.put(entry));
+    transaction.objectStore(STORE_NAME).put({ start: entries[0].index, entries });
     await transactionDone(transaction);
 }
 
@@ -99,10 +101,15 @@ async function getRange(start, count) {
     if (count <= 0) return [];
     const database = await openDatabase();
     const transaction = database.transaction(STORE_NAME, 'readonly');
-    const range = IDBKeyRange.bound(start, start + count - 1);
-    const result = await requestResult(transaction.objectStore(STORE_NAME).getAll(range));
+    const firstChunk = Math.floor(start / BATCH_SIZE) * BATCH_SIZE;
+    const lastIndex = start + count - 1;
+    const lastChunk = Math.floor(lastIndex / BATCH_SIZE) * BATCH_SIZE;
+    const range = IDBKeyRange.bound(firstChunk, lastChunk);
+    const chunks = await requestResult(transaction.objectStore(STORE_NAME).getAll(range));
     await transactionDone(transaction);
-    return result;
+    return chunks
+        .flatMap(chunk => chunk.entries)
+        .filter(entry => entry.index >= start && entry.index <= lastIndex);
 }
 
 async function searchMessages(id, query, limit) {
@@ -111,9 +118,9 @@ async function searchMessages(id, query, limit) {
     const database = await openDatabase();
     const transaction = database.transaction(STORE_NAME, 'readonly');
     const request = transaction.objectStore(STORE_NAME).openCursor(null, 'prev');
+    const results = [];
 
     return new Promise((resolve, reject) => {
-        const results = [];
         request.addEventListener('error', () => reject(request.error));
         request.addEventListener('success', () => {
             if (activeSearchId !== id) {
@@ -127,10 +134,13 @@ async function searchMessages(id, query, limit) {
                 return;
             }
 
-            const message = cursor.value;
-            if (message.type === 'message' &&
-                message.content?.toLocaleLowerCase().includes(normalizedQuery)) {
-                results.push(message);
+            const messages = cursor.value.entries;
+            for (let index = messages.length - 1; index >= 0 && results.length < limit; index--) {
+                const message = messages[index];
+                if (message.type === 'message' &&
+                    message.content?.toLocaleLowerCase().includes(normalizedQuery)) {
+                    results.push(message);
+                }
             }
             cursor.continue();
         });
@@ -148,6 +158,10 @@ self.addEventListener('message', async event => {
 
         if (result !== null) self.postMessage({ id, result });
     } catch (error) {
-        self.postMessage({ id, error: error?.message || '채팅 저장소 처리에 실패했습니다.' });
+        self.postMessage({
+            id,
+            error: error?.message || '채팅 저장소 처리에 실패했습니다.',
+            errorName: error?.name || 'Error'
+        });
     }
 });
