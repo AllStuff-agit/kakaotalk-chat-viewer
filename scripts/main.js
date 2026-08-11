@@ -6,6 +6,11 @@
 class KakaoTalkViewer {
     constructor() {
         this.renderer = new ChatRenderer('chat-messages');
+        this.searchRenderer = new SearchResultsRenderer(
+            'search-results',
+            'search-scroll-container',
+            index => this.renderer.scrollToIndex(index)
+        );
         this.currentChatData = null;
         this.store = null;
         this.searchGeneration = 0;
@@ -172,6 +177,7 @@ class KakaoTalkViewer {
             this.store = new ChatStore();
             openedStore = true;
             this.currentChatData = null;
+            this.searchRenderer.clear();
             this.renderer.chatData = null;
             document.getElementById('chat-container').classList.add('hidden');
             document.getElementById('welcome-screen').classList.remove('hidden');
@@ -381,10 +387,16 @@ class KakaoTalkViewer {
         this.showSearchLoading();
 
         try {
-            const results = await this.searchMessages(query);
+            const { total } = await this.searchMessages(query);
+            if (generation !== this.searchGeneration) return;
+            await this.searchRenderer.render(
+                total,
+                query,
+                this.store,
+                date => this.formatSearchDate(date)
+            );
             if (generation !== this.searchGeneration) return;
             this.hideSearchLoading();
-            this.displaySearchResults(results, query);
         } catch (error) {
             if (error.name !== 'AbortError') {
                 this.hideSearchLoading();
@@ -396,15 +408,11 @@ class KakaoTalkViewer {
     /**
      * 메시지 검색
      * @param {string} query - 검색어
-     * @returns {Array} 검색 결과
+     * @returns {{total: number}} 검색 결과 수
      */
     async searchMessages(query) {
-        if (!this.currentChatData || !this.store) return [];
-        const results = await this.store.search(query, 200);
-        return results.map(message => ({
-            ...message,
-            highlightedContent: this.highlightSearchTerm(message.content, query)
-        }));
+        if (!this.currentChatData || !this.store) return { total: 0 };
+        return this.store.search(query);
     }
     
     /**
@@ -467,61 +475,12 @@ class KakaoTalkViewer {
     }
     
     /**
-     * 검색 결과 표시
-     * @param {Array} results - 검색 결과
-     * @param {string} query - 검색어
-     */
-    displaySearchResults(results, query) {
-        const resultsContainer = document.getElementById('search-results');
-        const safeQuery = this.escapeHtml(query);
-        
-        if (results.length === 0) {
-            resultsContainer.innerHTML = `
-                <div class="text-center text-gray-500 text-sm py-8">
-                    "${safeQuery}"에 대한 검색 결과가 없습니다
-                </div>
-            `;
-            return;
-        }
-        
-        const resultsHTML = `
-            <div class="mb-4">
-                <div class="text-sm text-gray-600 mb-3">최근 검색 결과 ${results.length}개 (최대 200개)</div>
-            </div>
-            <div class="space-y-3">
-                ${results.map((result, index) => `
-                    <div class="p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" 
-                         onclick="window.scrollToMessage(${result.index})">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="flex items-center">
-                                <span class="text-sm font-medium text-gray-700">${this.escapeHtml(result.sender)}</span>
-                                <span class="text-xs text-gray-500 ml-2">${this.escapeHtml(result.time)}</span>
-                            </div>
-                            <div class="text-xs text-gray-400">${this.escapeHtml(this.formatSearchDate(result.date))}</div>
-                        </div>
-                        <div class="text-sm text-gray-800 leading-relaxed">
-                            ${result.highlightedContent}
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-        
-        resultsContainer.innerHTML = resultsHTML;
-    }
-    
-    /**
      * 검색 결과 지우기
      */
     clearSearchResults() {
+        this.searchGeneration++;
         this.hideSearchLoading();
-        const resultsContainer = document.getElementById('search-results');
-        resultsContainer.classList.remove('hidden');
-        resultsContainer.innerHTML = `
-            <div class="text-center text-gray-500 text-sm py-8">
-                검색어를 입력해주세요
-            </div>
-        `;
+        this.searchRenderer.clear();
     }
     
     /**

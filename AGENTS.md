@@ -8,6 +8,7 @@
 - `parser.worker.js`: 대용량 파일을 스트리밍 파싱해 IndexedDB에 분할 저장하고 조회한다.
 - `chat-store.js`: 메인 화면과 저장 Worker 사이의 비동기 요청을 관리한다.
 - `renderer.js`: 메시지를 화면에 표시하고 채팅 UI 상태를 관리한다.
+- `search-renderer.js`: 검색 결과를 연속 가상 스크롤로 표시한다.
 - `main.js`: 파일 입력, 검증, 검색, 달력 및 애플리케이션 이벤트를 연결한다.
 - `*.test.mjs`: Node.js 기본 `assert`를 사용하는 회귀 검사다.
 

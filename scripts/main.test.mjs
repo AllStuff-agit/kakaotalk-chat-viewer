@@ -15,24 +15,15 @@ assert.equal(viewer.validateFile({ name: 'large-chat.txt', size: 10 ** 12, type:
 
 viewer.currentChatData = { totalEntries: 1_000_000, totalMessages: 999_000 };
 viewer.store = {
-    async search(query, limit) {
+    async search(query) {
         assert.equal(query, '<img');
-        assert.equal(limit, 200);
-        return [{
-            content: '<img src=x> 검색',
-            date: '2026년 8월 10일 월요일',
-            index: 7,
-            sender: '<관리자>',
-            time: '오후 1:00',
-            type: 'message'
-        }];
+        assert.equal(arguments.length, 1, '검색 결과 개수 제한을 전달하면 안 된다.');
+        return { total: 1200 };
     }
 };
 
 const results = await viewer.searchMessages('<img');
-assert.equal(results[0].index, 7);
-assert.equal(results[0].highlightedContent.includes('<img src=x>'), false, '검색 결과 HTML을 이스케이프해야 한다.');
-assert.equal(results[0].highlightedContent.includes('<mark'), true);
+assert.equal(results.total, 1200);
 assert.equal(viewer.escapeHtml('<script>'), '&lt;script&gt;');
 
 viewer.availableDates = new Set();
