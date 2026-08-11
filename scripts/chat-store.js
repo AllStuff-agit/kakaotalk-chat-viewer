@@ -53,13 +53,17 @@ class ChatStore {
         return this.request('range', { start, count });
     }
 
-    search(query, limit = 200) {
+    search(query) {
         for (const [id, request] of this.pending) {
             if (request.type !== 'search') continue;
             this.pending.delete(id);
             request.reject(new DOMException('새 검색이 시작되었습니다.', 'AbortError'));
         }
-        return this.request('search', { query, limit });
+        return this.request('search', { query });
+    }
+
+    getSearchRange(start, count) {
+        return this.request('searchRange', { start, count });
     }
 
     rejectAll(error) {

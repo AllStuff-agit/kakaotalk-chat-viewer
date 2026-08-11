@@ -52,8 +52,17 @@ const staleSearch = store.search('이전');
 const latestSearch = store.search('최근');
 await assert.rejects(staleSearch, error => error.name === 'AbortError');
 const latestRequest = worker.messages.at(-1);
-worker.emit({ id: latestRequest.id, result: [{ index: 7 }] });
-assert.equal((await latestSearch)[0].index, 7);
+assert.equal('limit' in latestRequest, false, '검색 요청에 결과 개수 제한을 보내면 안 된다.');
+worker.emit({ id: latestRequest.id, result: { total: 1200 } });
+assert.equal((await latestSearch).total, 1200);
+
+const searchRangePromise = store.getSearchRange(800, 200);
+const searchRangeRequest = worker.messages.at(-1);
+assert.equal(searchRangeRequest.type, 'searchRange');
+assert.equal(searchRangeRequest.start, 800);
+assert.equal(searchRangeRequest.count, 200);
+worker.emit({ id: searchRangeRequest.id, result: [{ index: 7 }] });
+assert.equal((await searchRangePromise)[0].index, 7);
 
 store.close();
 assert.equal(worker.terminated, true);
