@@ -112,9 +112,11 @@ class ChatRenderer {
 
     adjustBottomSpacer(topHeight, fallbackHeight) {
         const elements = [...this.container.querySelectorAll('[data-message-index]')];
-        const renderedHeight = elements.length > 0
-            ? elements.reduce((height, element) => height + element.getBoundingClientRect().height, 0)
-            : fallbackHeight;
+        const measuredHeight = elements.reduce(
+            (height, element) => height + element.getBoundingClientRect().height,
+            0
+        );
+        const renderedHeight = measuredHeight > 0 ? measuredHeight : fallbackHeight;
         this.bottomSpacer.style.height = `${Math.max(0, this.virtualHeight - topHeight - renderedHeight)}px`;
     }
 

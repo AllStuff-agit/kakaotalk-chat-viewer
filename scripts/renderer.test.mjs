@@ -125,4 +125,21 @@ assert.ok(Math.abs(renderer.offsetToIndex(renderer.indexToOffset(500000)) - 5000
 const safeLink = renderer.renderLinkMessage('https://example.com/" onclick="alert(1) <img>');
 assert.equal(safeLink.includes('<img>'), false, '채팅 내용의 HTML을 실행하면 안 된다.');
 assert.equal(safeLink.includes('rel="noopener noreferrer"'), true);
+
+const hiddenLastWindow = Object.create(sandbox.window.ChatRenderer.prototype);
+hiddenLastWindow.totalEntries = 1001;
+hiddenLastWindow.renderEnd = 1001;
+hiddenLastWindow.virtualHeight = 64064;
+hiddenLastWindow.bottomSpacer = { style: { height: '0px' } };
+hiddenLastWindow.container = {
+    querySelectorAll: () => Array.from({ length: 400 }, () => ({
+        getBoundingClientRect: () => ({ height: 0 })
+    }))
+};
+hiddenLastWindow.adjustBottomSpacer(38464, 25600);
+assert.equal(
+    hiddenLastWindow.bottomSpacer.style.height,
+    '0px',
+    '숨겨진 채팅창의 마지막 구간 아래에 가상 여백을 만들면 안 된다.'
+);
 console.log('renderer storage virtualization check passed');
