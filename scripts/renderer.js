@@ -610,10 +610,14 @@ class ChatRenderer {
         }
         this.container.scrollTop = this.indexToOffset(index);
 
-        const target = this.container.querySelector(`[data-message-index="${index}"]`);
+        const selector = `[data-message-index="${index}"]`;
+        const target = this.container.querySelector(selector);
         if (!target) return;
 
         target.scrollIntoView({ behavior: 'auto', block: 'center' });
+        setTimeout(() => {
+            this.container.querySelector(selector)?.scrollIntoView({ behavior: 'auto', block: 'center' });
+        }, 0);
         if (highlight) {
             const previousHighlight = this.container.querySelector('.search-highlight');
             if (previousHighlight) {

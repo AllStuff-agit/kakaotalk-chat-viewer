@@ -142,4 +142,34 @@ assert.equal(
     '0px',
     '숨겨진 채팅창의 마지막 구간 아래에 가상 여백을 만들면 안 된다.'
 );
+
+const layoutShiftingTarget = {
+    aligned: false,
+    classList: { add: () => {}, remove: () => {} },
+    scrollIntoView() {
+        this.aligned = true;
+        if (this.firstAlignment !== false) {
+            this.firstAlignment = false;
+            queueMicrotask(() => { this.aligned = false; });
+        }
+    }
+};
+const dateJumpRenderer = Object.create(sandbox.window.ChatRenderer.prototype);
+dateJumpRenderer.chatData = {};
+dateJumpRenderer.totalEntries = 400;
+dateJumpRenderer.renderStart = 0;
+dateJumpRenderer.renderEnd = 400;
+dateJumpRenderer.virtualHeight = 25600;
+dateJumpRenderer.container = {
+    clientHeight: 800,
+    querySelector: selector => selector.includes('200') ? layoutShiftingTarget : null,
+    scrollTop: 0
+};
+await dateJumpRenderer.scrollToIndex(200, false);
+await new Promise(resolve => setTimeout(resolve, 0));
+assert.equal(
+    layoutShiftingTarget.aligned,
+    true,
+    '실제 말풍선 높이가 확정된 뒤에도 선택한 날짜가 화면 안에 있어야 한다.'
+);
 console.log('renderer storage virtualization check passed');

@@ -568,8 +568,13 @@ class KakaoTalkViewer {
         const searchResults = document.getElementById('search-results');
         const searchLoading = document.getElementById('search-loading');
         
-        // 달력을 열 때마다 오늘 날짜로 초기화
-        this.currentCalendarDate = new Date();
+        const latestChatDate = [...this.availableDates].sort().at(-1);
+        if (latestChatDate) {
+            const [year, month, day] = latestChatDate.split('-').map(Number);
+            this.currentCalendarDate = new Date(year, month - 1, day);
+        } else {
+            this.currentCalendarDate = new Date();
+        }
         
         // 검색 관련 요소 숨기고 달력 표시
         searchResults.classList.add('hidden');
